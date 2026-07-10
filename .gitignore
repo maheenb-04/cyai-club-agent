@@ -1,0 +1,20 @@
+# Environment & secrets
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data (member list is sensitive - not tracked)
+data/members.csv
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/settings.json
+*.db
