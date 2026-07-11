@@ -7,6 +7,7 @@ from app.database import get_db
 from app import models
 from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
 from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
+from app.services.sourcing.job_aggregator import fetch_adzuna_jobs
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -54,9 +55,33 @@ def delete_opportunity(opportunity_id: int, db: Session = Depends(get_db)):
     db.delete(opportunity)
     db.commit()
     return {"detail": "Opportunity deleted"}
+
+
 @router.post("/sync/ctftime")
 def sync_ctftime(db: Session = Depends(get_db)):
     fetched = fetch_upcoming_ctf_events(limit=20)
+    added = 0
+    skipped = 0
+
+    for item in fetched:
+        exists = db.query(models.Opportunity).filter(
+            models.Opportunity.source == item["source"]
+        ).first()
+        if exists:
+            skipped += 1
+            continue
+
+        db_opportunity = models.Opportunity(**item)
+        db.add(db_opportunity)
+        added += 1
+
+    db.commit()
+    return {"added": added, "skipped_duplicates": skipped, "total_fetched": len(fetched)}
+
+
+@router.post("/sync/adzuna")
+def sync_adzuna(db: Session = Depends(get_db)):
+    fetched = fetch_adzuna_jobs(results_per_keyword=10)
     added = 0
     skipped = 0
 
