@@ -18,6 +18,20 @@ AGGREGATOR_DOMAINS = [
     "hbcuconnect.com",
 ]
 
+REFERENCE_DOMAINS = [
+    "wikipedia.org",
+    "reddit.com",
+    "quora.com",
+    "youtube.com",
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+    "instagram.com",
+    "pinterest.com",
+    "dictionary.com",
+    "britannica.com",
+]
+
 STALE_YEAR_PATTERN = re.compile(r"20(1[0-9]|2[0-5])\b")
 
 MONTH_TO_NUM = {
@@ -28,6 +42,14 @@ MONTH_TO_NUM = {
 
 def _is_aggregator(url: str) -> bool:
     return any(domain in url for domain in AGGREGATOR_DOMAINS)
+
+
+def _is_reference_site(url: str) -> bool:
+    return any(domain in url for domain in REFERENCE_DOMAINS)
+
+
+def _is_rejected(url: str) -> bool:
+    return _is_aggregator(url) or _is_reference_site(url)
 
 
 def _mentions_stale_year(text: str) -> bool:
@@ -60,7 +82,7 @@ def _find_official_url(title: str, organization: str) -> str:
     query = f"{title} {organization} 2026 official apply application scholarship"
     results = search_web(query, max_results=6)
 
-    candidates = [r for r in results if not _is_aggregator(r["url"])]
+    candidates = [r for r in results if not _is_rejected(r["url"])]
     if not candidates:
         return ""
 
@@ -77,6 +99,7 @@ Here are search result candidates:
 {candidate_text}
 
 Pick the ONE candidate that is most likely the official, current 2026 application page.
+It must be the scholarship provider's own site or a direct application portal - NOT a general reference/encyclopedia page, NOT a social media page, NOT a news article.
 Avoid any result that clearly references an old cycle (e.g. 2022, 2023, 2024, 2025 in the title/snippet) unless it's the only option.
 Respond with ONLY a JSON array with one object: [{{"index": <number>}}]
 If none seem appropriate, respond with: [{{"index": -1}}]
@@ -151,7 +174,7 @@ If none of the search results qualify, respond with an empty array: []
 
         if not official_url or not is_link_valid(official_url):
             continue
-        if _mentions_stale_year(official_url):
+        if _mentions_stale_year(official_url) or _is_rejected(official_url):
             continue
 
         item["url"] = official_url
