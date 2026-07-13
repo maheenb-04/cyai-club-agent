@@ -7,7 +7,7 @@ from app.database import get_db
 from app import models
 from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
 from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
-from app.services.sourcing.job_aggregator import fetch_adzuna_jobs
+from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna_internships
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -82,6 +82,28 @@ def sync_ctftime(db: Session = Depends(get_db)):
 @router.post("/sync/adzuna")
 def sync_adzuna(db: Session = Depends(get_db)):
     fetched = fetch_adzuna_jobs(results_per_keyword=10)
+    added = 0
+    skipped = 0
+
+    for item in fetched:
+        exists = db.query(models.Opportunity).filter(
+            models.Opportunity.source == item["source"]
+        ).first()
+        if exists:
+            skipped += 1
+            continue
+
+        db_opportunity = models.Opportunity(**item)
+        db.add(db_opportunity)
+        added += 1
+
+    db.commit()
+    return {"added": added, "skipped_duplicates": skipped, "total_fetched": len(fetched)}
+
+
+@router.post("/sync/adzuna-internships")
+def sync_adzuna_internships(db: Session = Depends(get_db)):
+    fetched = fetch_adzuna_internships(results_per_keyword=10)
     added = 0
     skipped = 0
 
