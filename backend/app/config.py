@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     gemini_api_key: str = ""
+    mistral_api_key: str = ""
+    tavily_api_key: str = ""
     gmail_address: str = ""
     gmail_app_password: str = ""
     adzuna_app_id: str = ""
