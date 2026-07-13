@@ -38,7 +38,7 @@ def _deadline_is_valid(deadline_str: str, target_month: str, current_year: int =
     if not deadline_str or deadline_str.lower() in ("none", "null", "rolling", "n/a"):
         return True
 
-    target_month_num = MONTH_TO_NUM.get(target_month.lower())
+    target_month_num = MONTH_TO_NUM.get(target_month.strip().lower())
     if not target_month_num:
         return True
 
@@ -94,6 +94,8 @@ If none seem appropriate, respond with: [{{"index": -1}}]
 
 
 def find_scholarships(target_month: str, max_results: int = 8) -> list[dict]:
+    target_month = target_month.strip()
+
     search_results = search_web(
         f"cybersecurity artificial intelligence scholarship fellowship "
         f"undergraduate college students open application {target_month} 2026",

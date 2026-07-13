@@ -8,6 +8,7 @@ from app import models
 from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
 from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
 from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna_internships
+from app.services.scholarship_finder import find_scholarships
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -121,3 +122,36 @@ def sync_adzuna_internships(db: Session = Depends(get_db)):
 
     db.commit()
     return {"added": added, "skipped_duplicates": skipped, "total_fetched": len(fetched)}
+
+
+@router.post("/find-scholarships")
+def find_and_add_scholarships(target_month: str, db: Session = Depends(get_db)):
+    results = find_scholarships(target_month)
+    added = 0
+    skipped = 0
+
+    for item in results:
+        source = f"ai_search:{item.get('url', '')}"
+        exists = db.query(models.Opportunity).filter(
+            models.Opportunity.source == source
+        ).first()
+        if exists:
+            skipped += 1
+            continue
+
+        db_opportunity = models.Opportunity(
+            category="scholarship",
+            title=item.get("title", "Untitled"),
+            organization=item.get("organization"),
+            description=item.get("description"),
+            url=item.get("url", ""),
+            deadline=item.get("deadline"),
+            eligibility=item.get("eligibility"),
+            source=source,
+            source_type="ai_search",
+        )
+        db.add(db_opportunity)
+        added += 1
+
+    db.commit()
+    return {"added": added, "skipped_duplicates": skipped, "total_found": len(results)}
