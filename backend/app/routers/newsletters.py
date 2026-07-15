@@ -39,7 +39,18 @@ def generate_newsletter(request: Request, month_label: str, db: Session = Depend
     if not opportunities and not events:
         raise HTTPException(status_code=400, detail="No active opportunities or events to include")
 
-    result = generate_newsletter_html(opportunities, month_label, events)
+    last_newsletter = db.query(models.Newsletter).order_by(
+        models.Newsletter.created_at.desc()
+    ).first()
+
+    recently_featured_ids = set()
+    if last_newsletter:
+        links = db.query(models.NewsletterOpportunity).filter(
+            models.NewsletterOpportunity.newsletter_id == last_newsletter.id
+        ).all()
+        recently_featured_ids = {link.opportunity_id for link in links}
+
+    result = generate_newsletter_html(opportunities, month_label, events, recently_featured_ids)
 
     newsletter = models.Newsletter(
         status="draft",
@@ -49,6 +60,12 @@ def generate_newsletter(request: Request, month_label: str, db: Session = Depend
     db.add(newsletter)
     db.commit()
     db.refresh(newsletter)
+
+    included_ids = result.get("included_opportunity_ids", [])
+    for opp_id in included_ids:
+        db.add(models.NewsletterOpportunity(newsletter_id=newsletter.id, opportunity_id=opp_id))
+    db.commit()
+
     return newsletter
 
 
@@ -65,6 +82,24 @@ def update_newsletter(newsletter_id: int, update: NewsletterUpdate, db: Session 
     db.commit()
     db.refresh(newsletter)
     return newsletter
+
+
+@router.get("/{newsletter_id}/opportunities")
+def get_newsletter_opportunities(newsletter_id: int, db: Session = Depends(get_db)):
+    newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+    if not newsletter:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+
+    links = db.query(models.NewsletterOpportunity).filter(
+        models.NewsletterOpportunity.newsletter_id == newsletter_id
+    ).all()
+
+    opportunity_ids = [link.opportunity_id for link in links]
+    opportunities = db.query(models.Opportunity).filter(
+        models.Opportunity.id.in_(opportunity_ids)
+    ).all()
+
+    return [{"id": o.id, "title": o.title, "category": o.category} for o in opportunities]
 
 
 @router.post("/{newsletter_id}/send")

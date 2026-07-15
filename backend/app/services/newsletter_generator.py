@@ -29,7 +29,7 @@ def _extract_location(eligibility_str: str):
     return None
 
 
-def _filter_and_sort(items: list, today: date) -> list:
+def _filter_and_sort(items: list, today: date, exclude_ids: set) -> list:
     with_deadline = []
     rolling = []
 
@@ -39,19 +39,27 @@ def _filter_and_sort(items: list, today: date) -> list:
 
         parsed = _parse_deadline(item.deadline)
         if item.deadline and parsed is None:
+            candidate = ("rolling", item)
+        elif parsed is None:
+            candidate = ("rolling", item)
+        elif parsed < today:
+            continue
+        else:
+            candidate = ("dated", (parsed, item))
+
+        if candidate[0] == "rolling":
             rolling.append(item)
-            continue
-        if parsed is None:
-            rolling.append(item)
-            continue
-        if parsed < today:
-            continue
-        with_deadline.append((parsed, item))
+        else:
+            with_deadline.append(candidate[1])
 
     with_deadline.sort(key=lambda x: x[0])
-    ordered = [item for _, item in with_deadline] + rolling
+    ordered_all = [item for _, item in with_deadline] + rolling
 
-    return ordered[:MAX_ITEMS_PER_CATEGORY]
+    fresh = [item for item in ordered_all if item.id not in exclude_ids]
+    repeats = [item for item in ordered_all if item.id in exclude_ids]
+
+    final = (fresh + repeats)[:MAX_ITEMS_PER_CATEGORY]
+    return final
 
 
 def _filter_events(events: list, today: date) -> list:
@@ -73,19 +81,24 @@ def _filter_events(events: list, today: date) -> list:
     return ordered
 
 
-def generate_newsletter_html(opportunities: list, month_label: str, events: list = None) -> dict:
+def generate_newsletter_html(opportunities: list, month_label: str, events: list = None, recently_featured_ids: set = None) -> dict:
     today = date.today()
     events = events or []
+    recently_featured_ids = recently_featured_ids or set()
 
     grouped = {}
     for opp in opportunities:
         grouped.setdefault(opp.category, []).append(opp)
 
     filtered_grouped = {
-        category: _filter_and_sort(items, today)
+        category: _filter_and_sort(items, today, recently_featured_ids)
         for category, items in grouped.items()
     }
     filtered_grouped = {k: v for k, v in filtered_grouped.items() if v}
+
+    included_opportunity_ids = [
+        item.id for items in filtered_grouped.values() for item in items
+    ]
 
     filtered_events = _filter_events(events, today)
 
@@ -143,7 +156,7 @@ Match this exact tone, structure, and formatting pattern, based on the club's ac
 
 {events_text}
 
-Here is the current opportunity data to include (already filtered to only current/upcoming items with valid links, capped to the most relevant per category):
+Here is the current opportunity data to include (already filtered to only current/upcoming items with valid links, capped to the most relevant per category, prioritizing items not recently featured):
 {sections_text}
 
 Respond with ONLY a JSON object in this exact format, no other text:
@@ -159,6 +172,7 @@ Respond with ONLY a JSON object in this exact format, no other text:
         result = result[0]
 
     if not isinstance(result, dict):
-        return {"subject": f"CYAI {month_label} Newsletter", "html_content": "<p>Error generating content.</p>"}
+        result = {"subject": f"CYAI {month_label} Newsletter", "html_content": "<p>Error generating content.</p>"}
 
+    result["included_opportunity_ids"] = included_opportunity_ids
     return result
