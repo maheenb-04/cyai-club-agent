@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
-from app.schemas.social_post import SocialPostResponse, SocialPostUpdate
+from app.schemas.social_post import SocialPostResponse, SocialPostUpdate, SocialPostManualCreate
 from app.services.social_generator import generate_circlein_post, generate_instagram_post
 from app.core.limiter import limiter
 
@@ -18,6 +18,25 @@ def list_social_posts(platform: Optional[str] = None, db: Session = Depends(get_
     if platform:
         query = query.filter(models.SocialPost.platform == platform)
     return query.order_by(models.SocialPost.created_at.desc()).all()
+
+
+@router.post("/", response_model=SocialPostResponse)
+def create_manual_social_post(post: SocialPostManualCreate, db: Session = Depends(get_db)):
+    if post.platform not in ("circlein", "instagram"):
+        raise HTTPException(status_code=400, detail="platform must be 'circlein' or 'instagram'")
+
+    db_post = models.SocialPost(
+        platform=post.platform,
+        content=post.content,
+        caption=post.caption,
+        hashtags=post.hashtags,
+        status="draft",
+        posting_mode="manual",
+    )
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    return db_post
 
 
 @router.post("/generate", response_model=SocialPostResponse)

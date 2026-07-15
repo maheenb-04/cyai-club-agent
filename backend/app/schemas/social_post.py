@@ -25,3 +25,10 @@ class SocialPostUpdate(BaseModel):
     caption: Optional[str] = None
     hashtags: Optional[str] = None
     status: Optional[str] = None
+
+
+class SocialPostManualCreate(BaseModel):
+    platform: str
+    content: Optional[str] = None
+    caption: Optional[str] = None
+    hashtags: Optional[str] = None
