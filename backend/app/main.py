@@ -5,7 +5,7 @@ from slowapi import _rate_limit_exceeded_handler
 
 from app.database import engine, Base
 from app import models
-from app.routers import opportunities, curated_sources, members, newsletters, events, social_posts
+from app.routers import opportunities, curated_sources, members, newsletters, events, social_posts, system
 from app.core.security import verify_api_key
 from app.core.limiter import limiter
 
@@ -30,6 +30,7 @@ app.include_router(members.router)
 app.include_router(newsletters.router, dependencies=[Depends(verify_api_key)])
 app.include_router(events.router, dependencies=[Depends(verify_api_key)])
 app.include_router(social_posts.router, dependencies=[Depends(verify_api_key)])
+app.include_router(system.router)
 
 
 @app.get("/")
