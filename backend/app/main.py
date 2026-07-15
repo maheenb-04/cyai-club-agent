@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
 from app import models
-from app.routers import opportunities, curated_sources, members, newsletters, events
+from app.routers import opportunities, curated_sources, members, newsletters, events, social_posts
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,6 +22,7 @@ app.include_router(curated_sources.router)
 app.include_router(members.router)
 app.include_router(newsletters.router)
 app.include_router(events.router)
+app.include_router(social_posts.router)
 
 
 @app.get("/")
