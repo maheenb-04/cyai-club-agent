@@ -1,6 +1,10 @@
+import csv
+import io
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,6 +23,29 @@ def list_members(active_only: bool = True, db: Session = Depends(get_db)):
     if active_only:
         query = query.filter(models.Member.is_active == True)
     return query.all()
+
+
+@router.get("/export/csv", dependencies=[Depends(verify_api_key)])
+def export_members_csv(active_only: bool = True, db: Session = Depends(get_db)):
+    query = db.query(models.Member)
+    if active_only:
+        query = query.filter(models.Member.is_active == True)
+    members = query.order_by(models.Member.added_at.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "email", "name", "is_active", "added_at"])
+
+    for m in members:
+        writer.writerow([m.id, m.email, m.name, m.is_active, m.added_at])
+
+    output.seek(0)
+    filename = f"cyai_members_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.post("/", response_model=MemberResponse, dependencies=[Depends(verify_api_key)])

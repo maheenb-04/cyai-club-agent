@@ -1,7 +1,10 @@
+import csv
+import io
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -28,6 +31,37 @@ def list_opportunities(
     if active_only:
         query = query.filter(models.Opportunity.is_active == True)
     return query.order_by(models.Opportunity.date_added.desc()).all()
+
+
+@router.get("/export/csv")
+def export_opportunities_csv(active_only: bool = True, db: Session = Depends(get_db)):
+    query = db.query(models.Opportunity)
+    if active_only:
+        query = query.filter(models.Opportunity.is_active == True)
+    opportunities = query.order_by(models.Opportunity.category, models.Opportunity.date_added.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id", "category", "title", "organization", "deadline", "url",
+        "eligibility", "description", "source", "source_type",
+        "link_status", "date_added", "is_active"
+    ])
+
+    for o in opportunities:
+        writer.writerow([
+            o.id, o.category, o.title, o.organization, o.deadline, o.url,
+            o.eligibility, o.description, o.source, o.source_type,
+            o.link_status, o.date_added, o.is_active
+        ])
+
+    output.seek(0)
+    filename = f"cyai_opportunities_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/{opportunity_id}", response_model=OpportunityResponse)
