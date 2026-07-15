@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models
 from app.schemas.member import MemberCreate, MemberResponse
+from app.services.tokens import verify_unsubscribe_token
 
 router = APIRouter(prefix="/members", tags=["members"])
 
@@ -51,6 +52,22 @@ def bulk_import_members(emails: List[str], db: Session = Depends(get_db)):
 
     db.commit()
     return {"added": added, "skipped_duplicates": skipped}
+
+
+@router.get("/unsubscribe")
+def unsubscribe(token: str, db: Session = Depends(get_db)):
+    try:
+        email = verify_unsubscribe_token(token)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired unsubscribe link")
+
+    member = db.query(models.Member).filter(models.Member.email == email).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    member.is_active = False
+    db.commit()
+    return {"detail": f"{email} has been unsubscribed successfully"}
 
 
 @router.delete("/{member_id}")
