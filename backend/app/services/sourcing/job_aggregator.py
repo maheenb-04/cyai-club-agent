@@ -8,12 +8,10 @@ from app.config import settings
 ADZUNA_BASE_URL = "https://api.adzuna.com/v1/api/jobs/us/search/1"
 
 JOB_KEYWORDS = [
-    "entry level cybersecurity",
-    "junior cybersecurity analyst",
-    "entry level information security",
+    "entry level cybersecurity analyst",
+    "entry level information security analyst",
     "associate cybersecurity analyst",
-    "entry level artificial intelligence",
-    "junior AI engineer",
+    "entry level artificial intelligence analyst",
 ]
 
 INTERNSHIP_KEYWORDS = [
@@ -27,12 +25,14 @@ EXCLUDE_TITLE_KEYWORDS = [
     "svp", "evp", "cto", "ciso", "cio", "senior manager", "executive",
     "architect", "staff engineer", "lead ", " iv", " iii", "scientist",
     "sr.", "sr ", "senior", "manager", "phd", "postdoc", "masters", "mba",
+    "junior", "jr.", "jr ", "ii",
 ]
 
 MAX_EXPERIENCE_YEARS = 2
 MAX_POSTING_AGE_DAYS = 30
 
-YEARS_PATTERN = re.compile(r"(\d{1,2})\+?\s*(?:to\s*\d{1,2})?\s*years?", re.IGNORECASE)
+YEARS_RANGE_PATTERN = re.compile(r"(\d{1,2})\s*(?:-|to)\s*(\d{1,2})\s*\+?\s*years?", re.IGNORECASE)
+YEARS_MINIMUM_PATTERN = re.compile(r"(\d{1,2})\s*\+\s*years?", re.IGNORECASE)
 
 
 def _is_appropriate_title(title: str) -> bool:
@@ -40,17 +40,20 @@ def _is_appropriate_title(title: str) -> bool:
     return not any(keyword in lowered for keyword in EXCLUDE_TITLE_KEYWORDS)
 
 
-def _requires_too_much_experience(description: str) -> bool:
+def _requires_too_much_experience(description: str, max_years: int = MAX_EXPERIENCE_YEARS) -> bool:
     if not description:
         return False
-    matches = YEARS_PATTERN.findall(description)
-    for match in matches:
-        try:
-            years = int(match)
-        except ValueError:
-            continue
-        if years > MAX_EXPERIENCE_YEARS:
+
+    for low, high in YEARS_RANGE_PATTERN.findall(description):
+        if int(low) > max_years:
             return True
+
+    text_without_ranges = YEARS_RANGE_PATTERN.sub("", description)
+
+    for num in YEARS_MINIMUM_PATTERN.findall(text_without_ranges):
+        if int(num) > max_years:
+            return True
+
     return False
 
 

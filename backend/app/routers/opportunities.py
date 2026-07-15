@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -9,6 +10,7 @@ from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
 from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
 from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna_internships
 from app.services.scholarship_finder import find_scholarships
+from app.services.link_validator import is_link_valid
 from app.core.limiter import limiter
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
@@ -160,3 +162,33 @@ def find_and_add_scholarships(request: Request, target_month: str, db: Session =
 
     db.commit()
     return {"added": added, "skipped_duplicates": skipped, "total_found": len(results)}
+
+
+@router.post("/check-links")
+@limiter.limit("3/hour")
+def check_links(request: Request, db: Session = Depends(get_db)):
+    active_opportunities = db.query(models.Opportunity).filter(
+        models.Opportunity.is_active == True
+    ).all()
+
+    valid_count = 0
+    dead_count = 0
+
+    for opp in active_opportunities:
+        is_valid = is_link_valid(opp.url)
+        opp.link_status = "valid" if is_valid else "dead"
+        opp.last_validated_at = datetime.utcnow()
+
+        if is_valid:
+            valid_count += 1
+        else:
+            dead_count += 1
+
+    db.commit()
+
+    return {
+        "total_checked": len(active_opportunities),
+        "valid": valid_count,
+        "dead": dead_count,
+        "note": "Dead links are flagged (link_status='dead') but NOT auto-deactivated - review and remove manually if needed.",
+    }

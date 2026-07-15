@@ -34,6 +34,9 @@ def _filter_and_sort(items: list, today: date) -> list:
     rolling = []
 
     for item in items:
+        if getattr(item, "link_status", None) == "dead":
+            continue
+
         parsed = _parse_deadline(item.deadline)
         if item.deadline and parsed is None:
             rolling.append(item)
@@ -140,7 +143,7 @@ Match this exact tone, structure, and formatting pattern, based on the club's ac
 
 {events_text}
 
-Here is the current opportunity data to include (already filtered to only current/upcoming items, capped to the most relevant per category):
+Here is the current opportunity data to include (already filtered to only current/upcoming items with valid links, capped to the most relevant per category):
 {sections_text}
 
 Respond with ONLY a JSON object in this exact format, no other text:
