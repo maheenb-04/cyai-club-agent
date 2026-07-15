@@ -89,4 +89,18 @@ class SocialPost(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     posted_at = Column(DateTime, nullable=True)
     external_post_id = Column(String, nullable=True)
-    
+
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    event_date = Column(String, nullable=True)
+    time_display = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    rsvp_link = Column(String, nullable=True)
+    event_type = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)

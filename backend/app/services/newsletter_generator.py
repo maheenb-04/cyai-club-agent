@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date
 
 from dateutil import parser as date_parser
 
@@ -18,6 +18,14 @@ def _parse_deadline(deadline_str: str):
         return parsed.date()
     except (ValueError, OverflowError):
         return None
+
+
+def _extract_location(eligibility_str: str):
+    if not eligibility_str:
+        return None
+    if eligibility_str.lower().startswith("location:"):
+        return eligibility_str.split(":", 1)[1].strip()
+    return None
 
 
 def _filter_and_sort(items: list, today: date) -> list:
@@ -59,24 +67,37 @@ def generate_newsletter_html(opportunities: list, month_label: str) -> dict:
     for category, items in filtered_grouped.items():
         sections_text += f"\n\nCategory: {category}\n"
         for item in items:
+            location = _extract_location(item.eligibility)
+            eligibility_display = item.eligibility if not location else "See posting for full eligibility details"
+
             sections_text += (
                 f"- Title: {item.title}\n"
                 f"  Organization: {item.organization or 'N/A'}\n"
                 f"  Deadline: {item.deadline or 'Rolling/No fixed deadline'}\n"
-                f"  URL: {item.url}\n"
-                f"  Eligibility: {item.eligibility or 'See posting for details'}\n"
+                f"  Location: {location or 'Not specified / remote-friendly'}\n"
+                f"  Application Link: {item.url}\n"
+                f"  Eligibility: {eligibility_display or 'See posting for details'}\n"
                 f"  Description: {(item.description or '')[:300]}\n"
             )
 
     prompt = f"""You are drafting the {month_label} newsletter for the Cybersecurity & AI Club (CYAI) at York College, CUNY.
 
-Match this exact tone and structure, based on the club's past newsletters:
-- Opens with "Dear Club Members," followed by a warm, semester-aware paragraph
-- Sections organized by category (Scholarships, Internships, Jobs, Fellowships, Bootcamps, CTFs/Competitions) - only include categories that have items below
-- Each item listed with title, organization, deadline, and a brief description, followed by an "Eligibility Requirements:" line
+Match this exact tone, structure, and formatting pattern, based on the club's actual past newsletters:
+
+- Opens with "Dear Club Members," followed by a warm, semester-aware paragraph (2-4 sentences) that reflects on the current point in the semester/summer and previews what's in the newsletter, in an encouraging, community-oriented voice
+- Sections organized by category (Scholarships, Internships, Jobs, Fellowships, Bootcamps, CTFs/Competitions) - only include categories that have items below, use <h2> for section headers
+- CRITICAL FORMATTING REQUIREMENT - every single item MUST include ALL of these fields, each on its own line, in this exact order:
+  1. Bold title (<strong>)
+  2. Organization
+  3. Deadline (write "Deadline: [date]" or "Deadline: Rolling/No fixed deadline" if none)
+  4. Location (write "Location: [location]" only if a real location was provided - OMIT this line entirely if location is "Not specified / remote-friendly")
+  5. A 1-2 sentence description of the opportunity
+  6. Eligibility Requirements: (a short bullet or sentence)
+  7. A clearly clickable link at the end of each item, formatted as: <a href="[url]">Apply Here</a> for jobs/internships, <a href="[url]">Apply Now</a> for scholarships, or <a href="[url]">Register / Learn More</a> for CTFs/events - pick the wording that fits the opportunity type
+- Do NOT omit the application link for ANY item - this is the most important requirement, every single item must end with a working, clickable link
 - Closes with a "Stay Connected" section mentioning Instagram @CYAIYORK
 - Signs off as: "Best Regards,\\nMaheen Bilal\\nPresident, Cybersecurity and AI Club\\nYork College, CUNY"
-- Warm, encouraging, professional but approachable tone, career-readiness framing
+- Warm, encouraging, professional but approachable tone, career-readiness framing, matching a real club president's voice - not overly corporate or robotic
 
 Here is the current opportunity data to include (already filtered to only current/upcoming items, capped to the most relevant per category):
 {sections_text}
@@ -84,7 +105,7 @@ Here is the current opportunity data to include (already filtered to only curren
 Respond with ONLY a JSON object in this exact format, no other text:
 {{
   "subject": "a compelling email subject line",
-  "html_content": "the full newsletter as clean HTML with basic tags like <p>, <h2>, <ul>, <li>, <a href='...'>, <strong> - no CSS styling needed, just semantic structure"
+  "html_content": "the full newsletter as clean HTML with basic tags like <p>, <h2>, <ul>, <li>, <a href='...'>, <strong>, <em> - no CSS styling needed, just semantic structure"
 }}
 """
 
