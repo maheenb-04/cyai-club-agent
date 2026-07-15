@@ -1,14 +1,20 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 from app.database import engine, Base
 from app import models
 from app.routers import opportunities, curated_sources, members, newsletters, events, social_posts
 from app.core.security import verify_api_key
+from app.core.limiter import limiter
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CYAI Club Assistant Agent")
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,

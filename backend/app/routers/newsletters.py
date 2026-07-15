@@ -1,7 +1,7 @@
 from typing import List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -9,6 +9,7 @@ from app import models
 from app.schemas.newsletter import NewsletterResponse, NewsletterUpdate
 from app.services.newsletter_generator import generate_newsletter_html
 from app.services.email_sender import send_newsletter_to_members
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
 
@@ -27,7 +28,8 @@ def get_newsletter(newsletter_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/generate", response_model=NewsletterResponse)
-def generate_newsletter(month_label: str, db: Session = Depends(get_db)):
+@limiter.limit("10/hour")
+def generate_newsletter(request: Request, month_label: str, db: Session = Depends(get_db)):
     opportunities = db.query(models.Opportunity).filter(
         models.Opportunity.is_active == True
     ).all()
@@ -66,7 +68,8 @@ def update_newsletter(newsletter_id: int, update: NewsletterUpdate, db: Session 
 
 
 @router.post("/{newsletter_id}/send")
-def send_newsletter(newsletter_id: int, db: Session = Depends(get_db)):
+@limiter.limit("3/hour")
+def send_newsletter(request: Request, newsletter_id: int, db: Session = Depends(get_db)):
     newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")

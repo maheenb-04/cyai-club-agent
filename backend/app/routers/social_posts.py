@@ -1,12 +1,13 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
 from app.schemas.social_post import SocialPostResponse, SocialPostUpdate
 from app.services.social_generator import generate_circlein_post, generate_instagram_post
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/social-posts", tags=["social-posts"])
 
@@ -20,7 +21,9 @@ def list_social_posts(platform: Optional[str] = None, db: Session = Depends(get_
 
 
 @router.post("/generate", response_model=SocialPostResponse)
+@limiter.limit("20/hour")
 def generate_social_post(
+    request: Request,
     platform: str,
     opportunity_id: Optional[int] = None,
     event_id: Optional[int] = None,

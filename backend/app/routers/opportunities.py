@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -9,6 +9,7 @@ from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
 from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
 from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna_internships
 from app.services.scholarship_finder import find_scholarships
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -59,7 +60,8 @@ def delete_opportunity(opportunity_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/sync/ctftime")
-def sync_ctftime(db: Session = Depends(get_db)):
+@limiter.limit("10/hour")
+def sync_ctftime(request: Request, db: Session = Depends(get_db)):
     fetched = fetch_upcoming_ctf_events(limit=20)
     added = 0
     skipped = 0
@@ -81,7 +83,8 @@ def sync_ctftime(db: Session = Depends(get_db)):
 
 
 @router.post("/sync/adzuna")
-def sync_adzuna(db: Session = Depends(get_db)):
+@limiter.limit("10/hour")
+def sync_adzuna(request: Request, db: Session = Depends(get_db)):
     fetched = fetch_adzuna_jobs(results_per_keyword=10)
     added = 0
     skipped = 0
@@ -103,7 +106,8 @@ def sync_adzuna(db: Session = Depends(get_db)):
 
 
 @router.post("/sync/adzuna-internships")
-def sync_adzuna_internships(db: Session = Depends(get_db)):
+@limiter.limit("10/hour")
+def sync_adzuna_internships(request: Request, db: Session = Depends(get_db)):
     fetched = fetch_adzuna_internships(results_per_keyword=10)
     added = 0
     skipped = 0
@@ -125,7 +129,8 @@ def sync_adzuna_internships(db: Session = Depends(get_db)):
 
 
 @router.post("/find-scholarships")
-def find_and_add_scholarships(target_month: str, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+def find_and_add_scholarships(request: Request, target_month: str, db: Session = Depends(get_db)):
     results = find_scholarships(target_month)
     added = 0
     skipped = 0

@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -8,6 +8,7 @@ from app import models
 from app.schemas.member import MemberCreate, MemberResponse
 from app.services.tokens import verify_unsubscribe_token
 from app.core.security import verify_api_key
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/members", tags=["members"])
 
@@ -34,7 +35,8 @@ def add_member(member: MemberCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/bulk-import", dependencies=[Depends(verify_api_key)])
-def bulk_import_members(emails: List[str], db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+def bulk_import_members(request: Request, emails: List[str], db: Session = Depends(get_db)):
     added = 0
     skipped = 0
 
