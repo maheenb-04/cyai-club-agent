@@ -32,10 +32,12 @@ def generate_newsletter(month_label: str, db: Session = Depends(get_db)):
         models.Opportunity.is_active == True
     ).all()
 
-    if not opportunities:
-        raise HTTPException(status_code=400, detail="No active opportunities to include")
+    events = db.query(models.Event).filter(models.Event.is_active == True).all()
 
-    result = generate_newsletter_html(opportunities, month_label)
+    if not opportunities and not events:
+        raise HTTPException(status_code=400, detail="No active opportunities or events to include")
+
+    result = generate_newsletter_html(opportunities, month_label, events)
 
     newsletter = models.Newsletter(
         status="draft",

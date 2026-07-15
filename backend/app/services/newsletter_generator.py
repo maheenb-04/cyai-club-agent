@@ -50,8 +50,28 @@ def _filter_and_sort(items: list, today: date) -> list:
     return ordered[:MAX_ITEMS_PER_CATEGORY]
 
 
-def generate_newsletter_html(opportunities: list, month_label: str) -> dict:
+def _filter_events(events: list, today: date) -> list:
+    with_date = []
+    undated = []
+
+    for event in events:
+        parsed = _parse_deadline(event.event_date)
+        if parsed is None:
+            undated.append(event)
+            continue
+        if parsed < today:
+            continue
+        with_date.append((parsed, event))
+
+    with_date.sort(key=lambda x: x[0])
+    ordered = [event for _, event in with_date] + undated
+
+    return ordered
+
+
+def generate_newsletter_html(opportunities: list, month_label: str, events: list = None) -> dict:
     today = date.today()
+    events = events or []
 
     grouped = {}
     for opp in opportunities:
@@ -62,6 +82,21 @@ def generate_newsletter_html(opportunities: list, month_label: str) -> dict:
         for category, items in grouped.items()
     }
     filtered_grouped = {k: v for k, v in filtered_grouped.items() if v}
+
+    filtered_events = _filter_events(events, today)
+
+    events_text = ""
+    if filtered_events:
+        events_text = "\n\nUpcoming Club Events:\n"
+        for event in filtered_events:
+            events_text += (
+                f"- Title: {event.title}\n"
+                f"  Date: {event.event_date or 'TBD'}\n"
+                f"  Time: {event.time_display or 'TBD'}\n"
+                f"  Location: {event.location or 'TBD'}\n"
+                f"  RSVP Link: {event.rsvp_link or 'N/A'}\n"
+                f"  Description: {(event.description or '')[:300]}\n"
+            )
 
     sections_text = ""
     for category, items in filtered_grouped.items():
@@ -85,19 +120,22 @@ def generate_newsletter_html(opportunities: list, month_label: str) -> dict:
 Match this exact tone, structure, and formatting pattern, based on the club's actual past newsletters:
 
 - Opens with "Dear Club Members," followed by a warm, semester-aware paragraph (2-4 sentences) that reflects on the current point in the semester/summer and previews what's in the newsletter, in an encouraging, community-oriented voice
-- Sections organized by category (Scholarships, Internships, Jobs, Fellowships, Bootcamps, CTFs/Competitions) - only include categories that have items below, use <h2> for section headers
-- CRITICAL FORMATTING REQUIREMENT - every single item MUST include ALL of these fields, each on its own line, in this exact order:
+- If "Upcoming Club Events" data is provided below, include an "Upcoming Events" section FIRST, before any opportunity categories - use <h2>Upcoming Events</h2>, and for each event include: bold title, Date, Time, Location (only if provided), a brief description, and an RSVP/registration link if one was provided
+- Then sections organized by opportunity category (Scholarships, Internships, Jobs, Fellowships, Bootcamps, CTFs/Competitions) - only include categories that have items below, use <h2> for section headers
+- CRITICAL FORMATTING REQUIREMENT for opportunity items - every single item MUST include ALL of these fields, each on its own line, in this exact order:
   1. Bold title (<strong>)
   2. Organization
   3. Deadline (write "Deadline: [date]" or "Deadline: Rolling/No fixed deadline" if none)
   4. Location (write "Location: [location]" only if a real location was provided - OMIT this line entirely if location is "Not specified / remote-friendly")
   5. A 1-2 sentence description of the opportunity
   6. Eligibility Requirements: (a short bullet or sentence)
-  7. A clearly clickable link at the end of each item, formatted as: <a href="[url]">Apply Here</a> for jobs/internships, <a href="[url]">Apply Now</a> for scholarships, or <a href="[url]">Register / Learn More</a> for CTFs/events - pick the wording that fits the opportunity type
-- Do NOT omit the application link for ANY item - this is the most important requirement, every single item must end with a working, clickable link
+  7. A clearly clickable link at the end of each item, formatted as: <a href="[url]">Apply Here</a> for jobs/internships, <a href="[url]">Apply Now</a> for scholarships, or <a href="[url]">Register / Learn More</a> for CTFs/events
+- Do NOT omit the application link for ANY opportunity item - every single item must end with a working, clickable link
 - Closes with a "Stay Connected" section mentioning Instagram @CYAIYORK
 - Signs off as: "Best Regards,\\nMaheen Bilal\\nPresident, Cybersecurity and AI Club\\nYork College, CUNY"
-- Warm, encouraging, professional but approachable tone, career-readiness framing, matching a real club president's voice - not overly corporate or robotic
+- Warm, encouraging, professional but approachable tone, career-readiness framing, matching a real club president's voice
+
+{events_text}
 
 Here is the current opportunity data to include (already filtered to only current/upcoming items, capped to the most relevant per category):
 {sections_text}
