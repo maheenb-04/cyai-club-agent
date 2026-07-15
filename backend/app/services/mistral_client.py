@@ -11,6 +11,7 @@ def generate_json(prompt: str, model: str = "mistral-small-latest") -> list[dict
     response = _client.chat.complete(
         model=model,
         messages=[{"role": "user", "content": prompt}],
+        timeout_ms=30000,
     )
 
     text = response.choices[0].message.content.strip()
