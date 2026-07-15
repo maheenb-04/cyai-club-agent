@@ -9,6 +9,9 @@ function SocialPosts() {
   const [sourceType, setSourceType] = useState('opportunity')
   const [sourceId, setSourceId] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [customText, setCustomText] = useState('')
+  const [customCaption, setCustomCaption] = useState('')
+  const [customHashtags, setCustomHashtags] = useState('')
 
   function loadPosts() {
     apiClient.get('/social-posts/').then((res) => setPosts(res.data))
@@ -31,6 +34,25 @@ function SocialPosts() {
       setSourceId('')
       loadPosts()
     }).finally(() => setGenerating(false))
+  }
+
+  function handleCreateCustom() {
+    if (platform === 'circlein' && !customText.trim()) return
+    if (platform === 'instagram' && !customCaption.trim()) return
+
+    const body = { platform }
+    if (platform === 'circlein') body.content = customText
+    else {
+      body.caption = customCaption
+      body.hashtags = customHashtags
+    }
+
+    apiClient.post('/social-posts/', body).then(() => {
+      setCustomText('')
+      setCustomCaption('')
+      setCustomHashtags('')
+      loadPosts()
+    })
   }
 
   function handleDelete(id) {
@@ -64,28 +86,77 @@ function SocialPosts() {
           >
             <option value="opportunity">From Opportunity</option>
             <option value="event">From Event</option>
+            <option value="custom">Write Your Own</option>
           </select>
-          <select
-            value={sourceId}
-            onChange={(e) => setSourceId(e.target.value)}
-            className="border border-periwinkle rounded-full px-4 py-2 font-body text-sm flex-1 min-w-[200px]"
-          >
-            <option value="">Select...</option>
-            {sourceType === 'opportunity' && opportunities.map((o) => (
-              <option key={o.id} value={o.id}>{o.title}</option>
-            ))}
-            {sourceType === 'event' && events.map((ev) => (
-              <option key={ev.id} value={ev.id}>{ev.title}</option>
-            ))}
-          </select>
+          {sourceType !== 'custom' && (
+            <select
+              value={sourceId}
+              onChange={(e) => setSourceId(e.target.value)}
+              className="border border-periwinkle rounded-full px-4 py-2 font-body text-sm flex-1 min-w-[200px]"
+            >
+              <option value="">Select...</option>
+              {sourceType === 'opportunity' && opportunities.map((o) => (
+                <option key={o.id} value={o.id}>{o.title}</option>
+              ))}
+              {sourceType === 'event' && events.map((ev) => (
+                <option key={ev.id} value={ev.id}>{ev.title}</option>
+              ))}
+            </select>
+          )}
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={generating || !sourceId}
-          className="bg-cardinal text-white font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform disabled:opacity-50"
-        >
-          {generating ? 'Generating...' : 'Generate Post'}
-        </button>
+
+        {sourceType !== 'custom' && (
+          <button
+            onClick={handleGenerate}
+            disabled={generating || !sourceId}
+            className="bg-cardinal text-white font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform disabled:opacity-50"
+          >
+            {generating ? 'Generating...' : 'Generate Post'}
+          </button>
+        )}
+
+        {sourceType === 'custom' && platform === 'circlein' && (
+          <div>
+            <textarea
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              rows={5}
+              placeholder="Write your CircleIn post..."
+              className="border border-periwinkle rounded-lg px-3 py-2 w-full font-body text-sm mb-3"
+            />
+            <button
+              onClick={handleCreateCustom}
+              className="bg-mustard text-ink font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
+            >
+              Save Post
+            </button>
+          </div>
+        )}
+
+        {sourceType === 'custom' && platform === 'instagram' && (
+          <div>
+            <textarea
+              value={customCaption}
+              onChange={(e) => setCustomCaption(e.target.value)}
+              rows={4}
+              placeholder="Write your Instagram caption..."
+              className="border border-periwinkle rounded-lg px-3 py-2 w-full font-body text-sm mb-3"
+            />
+            <input
+              type="text"
+              value={customHashtags}
+              onChange={(e) => setCustomHashtags(e.target.value)}
+              placeholder="#CYAIYork #Cybersecurity #AI"
+              className="border border-periwinkle rounded-lg px-3 py-2 w-full font-mono text-sm mb-3"
+            />
+            <button
+              onClick={handleCreateCustom}
+              className="bg-mustard text-ink font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
+            >
+              Save Post
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -103,7 +174,7 @@ function SocialPosts() {
               <div>
                 <p className="font-body text-sm whitespace-pre-wrap mb-3" dangerouslySetInnerHTML={{ __html: p.content }} />
                 <button
-                  onClick={() => copyToClipboard(p.content.replace(/<[^>]*>/g, ''))}
+                  onClick={() => copyToClipboard((p.content || '').replace(/<[^>]*>/g, ''))}
                   className="bg-mustard text-ink font-display font-semibold text-xs px-4 py-2 rounded-full"
                 >
                   Copy Text
@@ -115,7 +186,7 @@ function SocialPosts() {
                 <p className="font-body text-sm mb-2">{p.caption}</p>
                 <p className="font-mono text-xs text-periwinkle mb-3">{p.hashtags}</p>
                 <button
-                  onClick={() => copyToClipboard(p.caption + '\n\n' + p.hashtags)}
+                  onClick={() => copyToClipboard((p.caption || '') + '\n\n' + (p.hashtags || ''))}
                   className="bg-mustard text-ink font-display font-semibold text-xs px-4 py-2 rounded-full"
                 >
                   Copy Caption
