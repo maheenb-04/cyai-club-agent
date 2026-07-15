@@ -102,5 +102,6 @@ class Event(Base):
     description = Column(Text, nullable=True)
     rsvp_link = Column(String, nullable=True)
     event_type = Column(String, nullable=True)
+    image_filename = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
