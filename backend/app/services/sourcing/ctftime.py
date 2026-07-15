@@ -20,12 +20,17 @@ def fetch_upcoming_ctf_events(limit: int = 20) -> list[dict]:
 
     opportunities = []
     for event in events:
+        title = event.get("title", "Untitled CTF")
+
+        if "cancelled" in title.lower() or "canceled" in title.lower():
+            continue
+
         start_str = event.get("start", "")
         deadline_display = start_str.split("T")[0] if start_str else None
 
         opportunities.append({
             "category": "ctf",
-            "title": event.get("title", "Untitled CTF"),
+            "title": title,
             "organization": event.get("organizers", [{}])[0].get("name") if event.get("organizers") else None,
             "description": event.get("description", "")[:500],
             "url": event.get("url") or event.get("ctftime_url", ""),
