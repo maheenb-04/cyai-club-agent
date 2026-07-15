@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     adzuna_api_key: str = ""
     database_url: str = "sqlite:///./cyai_agent.db"
     token_secret_key: str = ""
+    agent_api_key: str = ""
 
     class Config:
         env_file = ".env"

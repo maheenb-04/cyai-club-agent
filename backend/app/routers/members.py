@@ -7,11 +7,12 @@ from app.database import get_db
 from app import models
 from app.schemas.member import MemberCreate, MemberResponse
 from app.services.tokens import verify_unsubscribe_token
+from app.core.security import verify_api_key
 
 router = APIRouter(prefix="/members", tags=["members"])
 
 
-@router.get("/", response_model=List[MemberResponse])
+@router.get("/", response_model=List[MemberResponse], dependencies=[Depends(verify_api_key)])
 def list_members(active_only: bool = True, db: Session = Depends(get_db)):
     query = db.query(models.Member)
     if active_only:
@@ -19,7 +20,7 @@ def list_members(active_only: bool = True, db: Session = Depends(get_db)):
     return query.all()
 
 
-@router.post("/", response_model=MemberResponse)
+@router.post("/", response_model=MemberResponse, dependencies=[Depends(verify_api_key)])
 def add_member(member: MemberCreate, db: Session = Depends(get_db)):
     existing = db.query(models.Member).filter(models.Member.email == member.email).first()
     if existing:
@@ -32,7 +33,7 @@ def add_member(member: MemberCreate, db: Session = Depends(get_db)):
     return db_member
 
 
-@router.post("/bulk-import")
+@router.post("/bulk-import", dependencies=[Depends(verify_api_key)])
 def bulk_import_members(emails: List[str], db: Session = Depends(get_db)):
     added = 0
     skipped = 0
@@ -70,7 +71,7 @@ def unsubscribe(token: str, db: Session = Depends(get_db)):
     return {"detail": f"{email} has been unsubscribed successfully"}
 
 
-@router.delete("/{member_id}")
+@router.delete("/{member_id}", dependencies=[Depends(verify_api_key)])
 def remove_member(member_id: int, db: Session = Depends(get_db)):
     member = db.query(models.Member).filter(models.Member.id == member_id).first()
     if not member:
