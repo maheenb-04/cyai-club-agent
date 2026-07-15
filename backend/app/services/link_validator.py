@@ -1,8 +1,14 @@
 import httpx
 
 
+def is_safe_url(url: str) -> bool:
+    if not url:
+        return False
+    return url.strip().lower().startswith(("http://", "https://"))
+
+
 def is_link_valid(url: str, timeout: float = 8.0) -> bool:
-    if not url or not url.startswith("http"):
+    if not is_safe_url(url):
         return False
 
     try:

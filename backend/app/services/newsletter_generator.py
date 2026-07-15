@@ -3,6 +3,7 @@ from datetime import date
 from dateutil import parser as date_parser
 
 from app.services.mistral_client import generate_json
+from app.services.link_validator import is_safe_url
 
 MAX_ITEMS_PER_CATEGORY = 5
 
@@ -89,12 +90,13 @@ def generate_newsletter_html(opportunities: list, month_label: str, events: list
     if filtered_events:
         events_text = "\n\nUpcoming Club Events:\n"
         for event in filtered_events:
+            rsvp = event.rsvp_link if is_safe_url(event.rsvp_link) else "N/A"
             events_text += (
                 f"- Title: {event.title}\n"
                 f"  Date: {event.event_date or 'TBD'}\n"
                 f"  Time: {event.time_display or 'TBD'}\n"
                 f"  Location: {event.location or 'TBD'}\n"
-                f"  RSVP Link: {event.rsvp_link or 'N/A'}\n"
+                f"  RSVP Link: {rsvp}\n"
                 f"  Description: {(event.description or '')[:300]}\n"
             )
 
@@ -104,13 +106,14 @@ def generate_newsletter_html(opportunities: list, month_label: str, events: list
         for item in items:
             location = _extract_location(item.eligibility)
             eligibility_display = item.eligibility if not location else "See posting for full eligibility details"
+            safe_url = item.url if is_safe_url(item.url) else "LINK_UNAVAILABLE"
 
             sections_text += (
                 f"- Title: {item.title}\n"
                 f"  Organization: {item.organization or 'N/A'}\n"
                 f"  Deadline: {item.deadline or 'Rolling/No fixed deadline'}\n"
                 f"  Location: {location or 'Not specified / remote-friendly'}\n"
-                f"  Application Link: {item.url}\n"
+                f"  Application Link: {safe_url}\n"
                 f"  Eligibility: {eligibility_display or 'See posting for details'}\n"
                 f"  Description: {(item.description or '')[:300]}\n"
             )
@@ -120,7 +123,7 @@ def generate_newsletter_html(opportunities: list, month_label: str, events: list
 Match this exact tone, structure, and formatting pattern, based on the club's actual past newsletters:
 
 - Opens with "Dear Club Members," followed by a warm, semester-aware paragraph (2-4 sentences) that reflects on the current point in the semester/summer and previews what's in the newsletter, in an encouraging, community-oriented voice
-- If "Upcoming Club Events" data is provided below, include an "Upcoming Events" section FIRST, before any opportunity categories - use <h2>Upcoming Events</h2>, and for each event include: bold title, Date, Time, Location (only if provided), a brief description, and an RSVP/registration link if one was provided
+- If "Upcoming Club Events" data is provided below, include an "Upcoming Events" section FIRST, before any opportunity categories - use <h2>Upcoming Events</h2>, and for each event include: bold title, Date, Time, Location (only if provided), a brief description, and an RSVP/registration link ONLY if the RSVP Link value is a real URL (not "N/A")
 - Then sections organized by opportunity category (Scholarships, Internships, Jobs, Fellowships, Bootcamps, CTFs/Competitions) - only include categories that have items below, use <h2> for section headers
 - CRITICAL FORMATTING REQUIREMENT for opportunity items - every single item MUST include ALL of these fields, each on its own line, in this exact order:
   1. Bold title (<strong>)
@@ -129,8 +132,8 @@ Match this exact tone, structure, and formatting pattern, based on the club's ac
   4. Location (write "Location: [location]" only if a real location was provided - OMIT this line entirely if location is "Not specified / remote-friendly")
   5. A 1-2 sentence description of the opportunity
   6. Eligibility Requirements: (a short bullet or sentence)
-  7. A clearly clickable link at the end of each item, formatted as: <a href="[url]">Apply Here</a> for jobs/internships, <a href="[url]">Apply Now</a> for scholarships, or <a href="[url]">Register / Learn More</a> for CTFs/events
-- Do NOT omit the application link for ANY opportunity item - every single item must end with a working, clickable link
+  7. If the Application Link value is "LINK_UNAVAILABLE", do NOT include any link for this item - just end the item without a link. Otherwise, include a clearly clickable link, formatted as: <a href="[url]">Apply Here</a> for jobs/internships, <a href="[url]">Apply Now</a> for scholarships, or <a href="[url]">Register / Learn More</a> for CTFs/events
+- NEVER invent, guess, or fabricate a URL under any circumstances - only use links exactly as provided above
 - Closes with a "Stay Connected" section mentioning Instagram @CYAIYORK
 - Signs off as: "Best Regards,\\nMaheen Bilal\\nPresident, Cybersecurity and AI Club\\nYork College, CUNY"
 - Warm, encouraging, professional but approachable tone, career-readiness framing, matching a real club president's voice

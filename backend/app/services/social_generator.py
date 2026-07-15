@@ -1,17 +1,19 @@
 from app.services.mistral_client import generate_json
+from app.services.link_validator import is_safe_url
 
 
 def _build_context(opportunity=None, event=None) -> str:
     if opportunity:
+        safe_url = opportunity.url if is_safe_url(opportunity.url) else "NO_LINK_PROVIDED"
         return (
             f"Title: {opportunity.title}\n"
             f"Organization: {opportunity.organization or 'N/A'}\n"
             f"Deadline: {opportunity.deadline or 'Rolling/No fixed deadline'}\n"
             f"Description: {opportunity.description or ''}\n"
-            f"Application Link: {opportunity.url}\n"
+            f"Application Link: {safe_url}\n"
         )
     if event:
-        link_line = event.rsvp_link if event.rsvp_link else "NO_LINK_PROVIDED"
+        link_line = event.rsvp_link if is_safe_url(event.rsvp_link) else "NO_LINK_PROVIDED"
         return (
             f"Title: {event.title}\n"
             f"Date: {event.event_date or 'TBD'}\n"
