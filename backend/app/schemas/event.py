@@ -22,6 +22,7 @@ class EventResponse(EventBase):
     id: int
     created_at: datetime
     is_active: bool
+    image_filename: Optional[str] = None
 
     class Config:
         from_attributes = True
