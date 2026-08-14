@@ -1,7 +1,9 @@
+import re
 from typing import List
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -9,9 +11,17 @@ from app import models
 from app.schemas.newsletter import NewsletterResponse, NewsletterUpdate
 from app.services.newsletter_generator import generate_newsletter_html
 from app.services.email_sender import send_newsletter_to_members
+from app.services.newsletter_renderer import render_newsletter_pdf
 from app.core.limiter import limiter
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
+
+
+def _extract_intro_html(html_content: str) -> str:
+    match = re.search(r"^(.*?)(?=<h2)", html_content, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return html_content[:500]
 
 
 @router.get("/", response_model=List[NewsletterResponse])
@@ -100,6 +110,55 @@ def get_newsletter_opportunities(newsletter_id: int, db: Session = Depends(get_d
     ).all()
 
     return [{"id": o.id, "title": o.title, "category": o.category} for o in opportunities]
+
+
+@router.get("/{newsletter_id}/render-pdf")
+@limiter.limit("10/hour")
+def render_newsletter_as_pdf(request: Request, newsletter_id: int, db: Session = Depends(get_db)):
+    newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+    if not newsletter:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+
+    links = db.query(models.NewsletterOpportunity).filter(
+        models.NewsletterOpportunity.newsletter_id == newsletter_id
+    ).all()
+    opportunity_ids = [link.opportunity_id for link in links]
+    opportunities = db.query(models.Opportunity).filter(
+        models.Opportunity.id.in_(opportunity_ids)
+    ).all()
+
+    opportunities_by_category = {}
+    for opp in opportunities:
+        opportunities_by_category.setdefault(opp.category, []).append({
+            "title": opp.title,
+            "organization": opp.organization,
+            "deadline": opp.deadline,
+            "url": opp.url,
+            "eligibility": opp.eligibility,
+            "description": opp.description,
+            "category": opp.category,
+        })
+
+    events = db.query(models.Event).filter(models.Event.is_active == True).all()
+    events_data = [{
+        "title": ev.title,
+        "event_date": ev.event_date,
+        "time_display": ev.time_display,
+        "location": ev.location,
+        "description": ev.description,
+        "rsvp_link": ev.rsvp_link,
+        "image_filename": ev.image_filename,
+    } for ev in events]
+
+    intro_html = _extract_intro_html(newsletter.html_content or "")
+
+    pdf_bytes = render_newsletter_pdf(newsletter.subject, intro_html, events_data, opportunities_by_category)
+
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=cyai_newsletter_{newsletter_id}.pdf"},
+    )
 
 
 @router.post("/{newsletter_id}/send")
