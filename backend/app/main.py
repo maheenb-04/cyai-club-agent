@@ -9,6 +9,7 @@ from app import models
 from app.routers import opportunities, curated_sources, members, newsletters, events, social_posts, system
 from app.core.security import verify_api_key
 from app.core.limiter import limiter
+from app.core.scheduler import start_scheduler, scheduled_daily_sync, scheduled_weekly_search
 
 Base.metadata.create_all(bind=engine)
 
@@ -36,6 +37,23 @@ app.include_router(social_posts.router, dependencies=[Depends(verify_api_key)])
 app.include_router(system.router)
 
 
+@app.on_event("startup")
+def on_startup():
+    start_scheduler()
+
+
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "cyai-club-agent"}
+
+
+@app.post("/system/trigger-daily-sync", dependencies=[Depends(verify_api_key)])
+def trigger_daily_sync():
+    scheduled_daily_sync()
+    return {"detail": "Daily sync triggered manually"}
+
+
+@app.post("/system/trigger-weekly-search", dependencies=[Depends(verify_api_key)])
+def trigger_weekly_search():
+    scheduled_weekly_search()
+    return {"detail": "Weekly AI search triggered manually"}

@@ -18,6 +18,16 @@ INTERNSHIP_KEYWORDS = [
     "cybersecurity internship",
     "AI internship",
     "information security internship",
+    "machine learning internship",
+    "data security internship",
+    "SOC analyst internship",
+    "network security internship",
+    "AI research internship",
+    "cyber defense internship",
+    "IT security internship",
+    "fall 2026 internship cybersecurity",
+    "fall 2026 internship AI",
+    "summer 2027 internship cybersecurity",
 ]
 
 EXCLUDE_TITLE_KEYWORDS = [
@@ -112,14 +122,14 @@ def _fetch_keyword_batch(keyword: str, results_per_keyword: int, category_label:
     return opportunities
 
 
-def fetch_adzuna_jobs(results_per_keyword: int = 10) -> list[dict]:
+def fetch_adzuna_jobs(results_per_keyword: int = 8) -> list[dict]:
     opportunities = []
     for keyword in JOB_KEYWORDS:
         opportunities.extend(_fetch_keyword_batch(keyword, results_per_keyword, "job"))
     return opportunities
 
 
-def fetch_adzuna_internships(results_per_keyword: int = 10) -> list[dict]:
+def fetch_adzuna_internships(results_per_keyword: int = 12) -> list[dict]:
     opportunities = []
     for keyword in INTERNSHIP_KEYWORDS:
         opportunities.extend(_fetch_keyword_batch(keyword, results_per_keyword, "internship"))
