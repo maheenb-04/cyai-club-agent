@@ -4,12 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from app import models
 from app.routers import opportunities, curated_sources, members, newsletters, events, social_posts, system
 from app.core.security import verify_api_key
 from app.core.limiter import limiter
 from app.core.scheduler import start_scheduler, scheduled_daily_sync, scheduled_weekly_search
+from app.services.opportunity_expiry import expire_old_opportunities
 
 Base.metadata.create_all(bind=engine)
 
@@ -57,3 +58,13 @@ def trigger_daily_sync():
 def trigger_weekly_search():
     scheduled_weekly_search()
     return {"detail": "Weekly AI search triggered manually"}
+
+
+@app.post("/system/expire-old-opportunities", dependencies=[Depends(verify_api_key)])
+def trigger_expiry_check():
+    db = SessionLocal()
+    try:
+        expired_count = expire_old_opportunities(db)
+        return {"expired_count": expired_count}
+    finally:
+        db.close()
