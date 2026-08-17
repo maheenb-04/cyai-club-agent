@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
 import apiClient from '../api/client'
 
+const emptyForm = {
+  title: '',
+  event_date: '',
+  time_display: '',
+  location: '',
+  description: '',
+  rsvp_link: '',
+  event_type: 'meeting',
+}
+
 function Events() {
   const [events, setEvents] = useState([])
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    title: '',
-    event_date: '',
-    time_display: '',
-    location: '',
-    description: '',
-    rsvp_link: '',
-    event_type: 'meeting',
-  })
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
 
   function loadEvents() {
     apiClient.get('/events/').then((res) => setEvents(res.data))
@@ -26,13 +29,43 @@ function Events() {
     setForm((f) => ({ ...f, [field]: value }))
   }
 
+  function startCreate() {
+    setForm(emptyForm)
+    setEditingId(null)
+    setShowForm(true)
+  }
+
+  function startEdit(ev) {
+    setForm({
+      title: ev.title || '',
+      event_date: ev.event_date || '',
+      time_display: ev.time_display || '',
+      location: ev.location || '',
+      description: ev.description || '',
+      rsvp_link: ev.rsvp_link || '',
+      event_type: ev.event_type || 'meeting',
+    })
+    setEditingId(ev.id)
+    setShowForm(true)
+  }
+
   function handleSubmit() {
     if (!form.title.trim()) return
-    apiClient.post('/events/', form).then(() => {
-      setForm({ title: '', event_date: '', time_display: '', location: '', description: '', rsvp_link: '', event_type: 'meeting' })
-      setShowForm(false)
-      loadEvents()
-    })
+
+    if (editingId) {
+      apiClient.patch('/events/' + editingId, form).then(() => {
+        setForm(emptyForm)
+        setEditingId(null)
+        setShowForm(false)
+        loadEvents()
+      })
+    } else {
+      apiClient.post('/events/', form).then(() => {
+        setForm(emptyForm)
+        setShowForm(false)
+        loadEvents()
+      })
+    }
   }
 
   function handleDelete(id) {
@@ -45,7 +78,7 @@ function Events() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-display font-extrabold text-4xl">Events</h2>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={showForm ? () => setShowForm(false) : startCreate}
           className="bg-cardinal text-white font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
         >
           {showForm ? 'Cancel' : '+ New Event'}
@@ -54,6 +87,9 @@ function Events() {
 
       {showForm && (
         <div className="bg-white rounded-2xl p-6 mb-6 space-y-3">
+          <p className="font-display font-semibold text-sm text-cardinal">
+            {editingId ? 'Editing Event' : 'New Event'}
+          </p>
           <input
             type="text"
             placeholder="Event title"
@@ -102,7 +138,7 @@ function Events() {
             onClick={handleSubmit}
             className="bg-mustard text-ink font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
           >
-            Create Event
+            {editingId ? 'Save Changes' : 'Create Event'}
           </button>
         </div>
       )}
@@ -117,12 +153,20 @@ function Events() {
               </p>
               {ev.description && <p className="font-body text-sm mt-2">{ev.description}</p>}
             </div>
-            <button
-              onClick={() => handleDelete(ev.id)}
-              className="font-display font-semibold text-xs text-cardinal flex-shrink-0"
-            >
-              Remove
-            </button>
+            <div className="flex gap-3 flex-shrink-0">
+              <button
+                onClick={() => startEdit(ev)}
+                className="font-display font-semibold text-xs text-periwinkle"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(ev.id)}
+                className="font-display font-semibold text-xs text-cardinal"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ))}
       </div>
