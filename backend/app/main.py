@@ -1,5 +1,6 @@
 import sys
 import asyncio
+import os
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -20,6 +21,8 @@ from app.services.opportunity_expiry import expire_old_opportunities
 from app.services.link_cleanup import check_and_deactivate_dead_links
 
 Base.metadata.create_all(bind=engine)
+
+os.makedirs("app/uploads/events", exist_ok=True)
 
 app = FastAPI(title="CYAI Club Assistant Agent")
 
