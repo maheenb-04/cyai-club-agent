@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     adzuna_app_id: str = ""
     adzuna_api_key: str = ""
     database_url: str = "sqlite:///./cyai_agent.db"
+    supabase_database_url: str = ""
     token_secret_key: str = ""
     agent_api_key: str = ""
 

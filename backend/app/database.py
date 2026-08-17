@@ -3,9 +3,22 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 from app.config import settings
 
+
+def _normalize_db_url(url: str) -> str:
+    if url.startswith("postgresql://") or url.startswith("postgres://"):
+        return url.replace("postgresql://", "postgresql+psycopg://").replace("postgres://", "postgresql+psycopg://")
+    return url
+
+
+DATABASE_URL = _normalize_db_url(settings.database_url)
+
+connect_args = {}
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False}
+    DATABASE_URL,
+    connect_args=connect_args,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -18,4 +31,4 @@ def get_db():
     try:
         yield db
     finally:
-        db.close() 
+        db.close()
