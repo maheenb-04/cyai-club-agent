@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
-from app.schemas.event import EventCreate, EventResponse
+from app.schemas.event import EventCreate, EventUpdate, EventResponse
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -26,6 +26,21 @@ def list_events(active_only: bool = True, db: Session = Depends(get_db)):
 def create_event(event: EventCreate, db: Session = Depends(get_db)):
     db_event = models.Event(**event.model_dump())
     db.add(db_event)
+    db.commit()
+    db.refresh(db_event)
+    return db_event
+
+
+@router.patch("/{event_id}", response_model=EventResponse)
+def update_event(event_id: int, event: EventUpdate, db: Session = Depends(get_db)):
+    db_event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not db_event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    update_data = event.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_event, key, value)
+
     db.commit()
     db.refresh(db_event)
     return db_event
