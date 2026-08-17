@@ -8,6 +8,8 @@ from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
 from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna_internships
 from app.services.scholarship_finder import find_scholarships
 from app.services.program_finder import find_tech_prep_programs, find_residency_programs
+from app.services.opportunity_expiry import expire_old_opportunities
+from app.services.link_cleanup import check_and_deactivate_dead_links
 
 logger = logging.getLogger("cyai_scheduler")
 
@@ -40,7 +42,7 @@ def _save_items(items: list, db):
 
 
 def scheduled_daily_sync():
-    logger.info("Running scheduled daily sync (CTFtime + Adzuna)")
+    logger.info("Running scheduled daily sync (CTFtime + Adzuna + expiry + link cleanup)")
     db = SessionLocal()
     try:
         ctf_items = fetch_upcoming_ctf_events(limit=20)
@@ -52,7 +54,13 @@ def scheduled_daily_sync():
         intern_items = fetch_adzuna_internships(results_per_keyword=12)
         added_interns = _save_items(intern_items, db)
 
-        logger.info(f"Daily sync complete: {added_ctf} CTFs, {added_jobs} jobs, {added_interns} internships added")
+        expired_count = expire_old_opportunities(db)
+        link_cleanup_result = check_and_deactivate_dead_links(db)
+
+        logger.info(
+            f"Daily sync complete: {added_ctf} CTFs, {added_jobs} jobs, {added_interns} internships added, "
+            f"{expired_count} expired, {link_cleanup_result['deactivated']} dead links deactivated"
+        )
     except Exception as e:
         logger.error(f"Daily sync failed: {e}")
     finally:
@@ -93,4 +101,4 @@ def start_scheduler():
     scheduler.add_job(scheduled_daily_sync, "interval", hours=24, id="daily_sync", replace_existing=True)
     scheduler.add_job(scheduled_weekly_search, "interval", days=7, id="weekly_search", replace_existing=True)
     scheduler.start()
-    logger.info("Scheduler started: daily sync (24h), weekly AI search (7d)")
+    logger.info("Scheduler started: daily sync (24h, includes expiry + link cleanup), weekly AI search (7d)")

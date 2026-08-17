@@ -17,6 +17,7 @@ from app.core.security import verify_api_key
 from app.core.limiter import limiter
 from app.core.scheduler import start_scheduler, scheduled_daily_sync, scheduled_weekly_search
 from app.services.opportunity_expiry import expire_old_opportunities
+from app.services.link_cleanup import check_and_deactivate_dead_links
 
 Base.metadata.create_all(bind=engine)
 
@@ -72,5 +73,15 @@ def trigger_expiry_check():
     try:
         expired_count = expire_old_opportunities(db)
         return {"expired_count": expired_count}
+    finally:
+        db.close()
+
+
+@app.post("/system/check-and-clean-dead-links", dependencies=[Depends(verify_api_key)])
+def trigger_link_cleanup():
+    db = SessionLocal()
+    try:
+        result = check_and_deactivate_dead_links(db)
+        return result
     finally:
         db.close()
