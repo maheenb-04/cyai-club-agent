@@ -9,6 +9,7 @@ function Newsletters() {
   const [editSubject, setEditSubject] = useState('')
   const [editHtml, setEditHtml] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
+  const [viewMode, setViewMode] = useState('preview')
 
   function loadNewsletters() {
     apiClient.get('/newsletters/').then((res) => setNewsletters(res.data))
@@ -35,6 +36,7 @@ function Newsletters() {
     setEditSubject(n.subject || '')
     setEditHtml(n.html_content || '')
     setConfirmSend(false)
+    setViewMode('preview')
   }
 
   function saveChanges() {
@@ -105,12 +107,36 @@ function Newsletters() {
 
       {selected && (
         <div className="bg-white rounded-2xl p-6">
-          <button
-            onClick={() => setSelected(null)}
-            className="font-display font-semibold text-sm text-cardinal mb-4"
-          >
-            Back to list
-          </button>
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setSelected(null)}
+              className="font-display font-semibold text-sm text-cardinal"
+            >
+              Back to list
+            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('preview')}
+                className={
+                  viewMode === 'preview'
+                    ? 'font-display font-semibold text-xs px-4 py-2 rounded-full bg-cardinal text-white'
+                    : 'font-display font-semibold text-xs px-4 py-2 rounded-full bg-cream text-ink'
+                }
+              >
+                Preview (Final Look)
+              </button>
+              <button
+                onClick={() => setViewMode('edit')}
+                className={
+                  viewMode === 'edit'
+                    ? 'font-display font-semibold text-xs px-4 py-2 rounded-full bg-cardinal text-white'
+                    : 'font-display font-semibold text-xs px-4 py-2 rounded-full bg-cream text-ink'
+                }
+              >
+                Edit HTML
+              </button>
+            </div>
+          </div>
 
           <label className="font-display font-semibold text-sm block mb-1">Subject</label>
           <input
@@ -121,14 +147,30 @@ function Newsletters() {
             className="border border-periwinkle rounded-lg px-3 py-2 w-full mb-4 font-body text-sm"
           />
 
-          <label className="font-display font-semibold text-sm block mb-1">HTML Content</label>
-          <textarea
-            value={editHtml}
-            onChange={(e) => setEditHtml(e.target.value)}
-            disabled={selected.status === 'sent'}
-            rows={12}
-            className="border border-periwinkle rounded-lg px-3 py-2 w-full font-mono text-xs mb-4"
-          />
+          {viewMode === 'preview' && (
+            <div className="mb-4">
+              <p className="font-mono text-xs text-ink-soft mb-2">
+                This is exactly how the newsletter will look when sent.
+              </p>
+              <div
+                className="border border-periwinkle rounded-lg p-6 bg-paper max-h-[600px] overflow-y-auto"
+                dangerouslySetInnerHTML={{ __html: editHtml }}
+              />
+            </div>
+          )}
+
+          {viewMode === 'edit' && (
+            <div className="mb-4">
+              <label className="font-display font-semibold text-sm block mb-1">HTML Content</label>
+              <textarea
+                value={editHtml}
+                onChange={(e) => setEditHtml(e.target.value)}
+                disabled={selected.status === 'sent'}
+                rows={16}
+                className="border border-periwinkle rounded-lg px-3 py-2 w-full font-mono text-xs"
+              />
+            </div>
+          )}
 
           {selected.status !== 'sent' && (
             <div className="flex flex-wrap gap-3">
