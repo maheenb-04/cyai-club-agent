@@ -44,31 +44,28 @@ SEASON_START_MONTH = {
     "winter": 12,
 }
 
-SEASON_YEAR_PATTERN = re.compile(
-    r"\b(spring|summer|fall|autumn|winter)\s+(20\d{2})\b", re.IGNORECASE
-)
+SEASON_WORD_PATTERN = re.compile(r"\b(spring|summer|fall|autumn|winter)\b", re.IGNORECASE)
+YEAR_PATTERN = re.compile(r"\b(20\d{2})\b")
 
 
-def _find_stale_season(text: str, today: date) -> bool:
-    if not text:
+def _find_stale_season(title: str, today: date) -> bool:
+    if not title:
         return False
 
-    matches = SEASON_YEAR_PATTERN.findall(text)
-    if not matches:
+    season_matches = list(set(m.lower() for m in SEASON_WORD_PATTERN.findall(title)))
+    year_matches = list(set(YEAR_PATTERN.findall(title)))
+
+    if len(season_matches) != 1 or len(year_matches) != 1:
         return False
 
-    for season, year_str in matches:
-        season = season.lower()
-        year = int(year_str)
-        start_month = SEASON_START_MONTH.get(season)
-        if not start_month:
-            continue
+    season = season_matches[0]
+    year = int(year_matches[0])
+    start_month = SEASON_START_MONTH.get(season)
+    if not start_month:
+        return False
 
-        cutoff = date(year, start_month, 1)
-        if today >= cutoff:
-            return True
-
-    return False
+    cutoff = date(year, start_month, 1)
+    return today >= cutoff
 
 
 def expire_stale_seasonal_opportunities(db) -> int:
@@ -81,8 +78,7 @@ def expire_stale_seasonal_opportunities(db) -> int:
 
     expired_count = 0
     for opp in active_opportunities:
-        combined_text = f"{opp.title or ''} {opp.description or ''}"
-        if _find_stale_season(combined_text, today):
+        if _find_stale_season(opp.title, today):
             opp.is_active = False
             expired_count += 1
 
