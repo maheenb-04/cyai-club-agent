@@ -33,7 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://cyai-club-agent-frontend.onrender.com",
+        "https://cyai-club-assistant.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
