@@ -42,6 +42,7 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory="app/uploads"), name="uploads")
+app.mount("/assets", StaticFiles(directory="app/assets"), name="assets")
 
 app.include_router(opportunities.router, dependencies=[Depends(verify_api_key)])
 app.include_router(curated_sources.router, dependencies=[Depends(verify_api_key)])

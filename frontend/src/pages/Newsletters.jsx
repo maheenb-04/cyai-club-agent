@@ -153,7 +153,7 @@ function Newsletters() {
                 This is exactly how the newsletter will look when sent.
               </p>
               <div
-                className="border border-periwinkle rounded-lg p-6 bg-paper max-h-[600px] overflow-y-auto"
+                className="newsletter-preview border border-periwinkle rounded-lg p-6 bg-paper max-h-[600px] overflow-y-auto"
                 dangerouslySetInnerHTML={{ __html: editHtml }}
               />
             </div>
