@@ -38,6 +38,13 @@ EXCLUDE_TITLE_KEYWORDS = [
     "junior", "jr.", "jr ", "ii",
 ]
 
+ACCEPTABLE_LOCATION_KEYWORDS = [
+    "new york", "nyc", "brooklyn", "queens", "manhattan", "bronx",
+    "staten island", "long island", "nassau", "suffolk", "westchester",
+    "new jersey", "jersey city", "newark", "hoboken", "connecticut",
+    "stamford", "greenwich", "remote", "anywhere",
+]
+
 MAX_EXPERIENCE_YEARS = 2
 MAX_POSTING_AGE_DAYS = 30
 
@@ -48,6 +55,11 @@ YEARS_MINIMUM_PATTERN = re.compile(r"(\d{1,2})\s*\+\s*years?", re.IGNORECASE)
 def _is_appropriate_title(title: str) -> bool:
     lowered = title.lower()
     return not any(keyword in lowered for keyword in EXCLUDE_TITLE_KEYWORDS)
+
+
+def _is_acceptable_location(location_str: str, description: str) -> bool:
+    combined = f"{location_str or ''} {description or ''}".lower()
+    return any(keyword in combined for keyword in ACCEPTABLE_LOCATION_KEYWORDS)
 
 
 def _requires_too_much_experience(description: str, max_years: int = MAX_EXPERIENCE_YEARS) -> bool:
@@ -83,6 +95,8 @@ def _fetch_keyword_batch(keyword: str, results_per_keyword: int, category_label:
         "app_id": settings.adzuna_app_id,
         "app_key": settings.adzuna_api_key,
         "what": keyword,
+        "where": "New York",
+        "distance": 60,
         "results_per_page": results_per_keyword,
         "content-type": "application/json",
     }
@@ -95,6 +109,7 @@ def _fetch_keyword_batch(keyword: str, results_per_keyword: int, category_label:
     for job in data.get("results", []):
         title = job.get("title", "Untitled Position")
         description = job.get("description", "") or ""
+        location = job.get("location", {}).get("display_name")
 
         if not _is_appropriate_title(title):
             continue
@@ -102,10 +117,10 @@ def _fetch_keyword_batch(keyword: str, results_per_keyword: int, category_label:
             continue
         if _requires_too_much_experience(description):
             continue
+        if not _is_acceptable_location(location, description):
+            continue
         if category_label == "internship" and "intern" not in title.lower():
             continue
-
-        location = job.get("location", {}).get("display_name")
 
         opportunities.append({
             "category": category_label,

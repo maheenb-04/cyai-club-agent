@@ -8,6 +8,7 @@ from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
 from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna_internships
 from app.services.scholarship_finder import find_scholarships
 from app.services.program_finder import find_tech_prep_programs, find_residency_programs
+from app.services.nyc_opportunity_finder import find_nyc_opportunities
 from app.services.opportunity_expiry import expire_old_opportunities
 from app.services.link_cleanup import check_and_deactivate_dead_links
 
@@ -68,7 +69,7 @@ def scheduled_daily_sync():
 
 
 def scheduled_weekly_search():
-    logger.info("Running scheduled weekly AI search (scholarships, tech-prep, residencies)")
+    logger.info("Running scheduled weekly AI search (scholarships, tech-prep, residencies, NYC opportunities)")
     db = SessionLocal()
     try:
         scholarships = find_scholarships("current")
@@ -90,7 +91,16 @@ def scheduled_weekly_search():
             r["source_type"] = "ai_search"
         added_res = _save_items(residencies, db)
 
-        logger.info(f"Weekly search complete: {added_sch} scholarships, {added_tech} tech-prep, {added_res} residencies added")
+        nyc_opps = find_nyc_opportunities()
+        for n in nyc_opps:
+            n["source"] = f"ai_search:{n.get('url', '')}"
+            n["source_type"] = "ai_search"
+        added_nyc = _save_items(nyc_opps, db)
+
+        logger.info(
+            f"Weekly search complete: {added_sch} scholarships, {added_tech} tech-prep, "
+            f"{added_res} residencies, {added_nyc} NYC/tri-state opportunities added"
+        )
     except Exception as e:
         logger.error(f"Weekly search failed: {e}")
     finally:
