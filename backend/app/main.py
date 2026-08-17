@@ -63,20 +63,6 @@ def health_check():
     return {"status": "ok", "service": "cyai-club-agent"}
 
 
-@app.get("/system/debug-assets", dependencies=[Depends(verify_api_key)])
-def debug_assets():
-    cwd = os.getcwd()
-    assets_path = os.path.join(cwd, "app", "assets")
-    exists = os.path.isdir(assets_path)
-    files = os.listdir(assets_path) if exists else []
-    return {
-        "cwd": cwd,
-        "assets_path": assets_path,
-        "assets_dir_exists": exists,
-        "files_in_assets": files,
-    }
-
-
 @app.post("/system/trigger-daily-sync", dependencies=[Depends(verify_api_key)])
 def trigger_daily_sync():
     scheduled_daily_sync()
