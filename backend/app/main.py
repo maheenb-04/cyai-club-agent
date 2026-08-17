@@ -34,6 +34,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "https://cyai-club-assistant.onrender.com",
+        "https://cyai-club-agent-frontend.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
