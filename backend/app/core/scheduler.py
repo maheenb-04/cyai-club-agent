@@ -9,7 +9,7 @@ from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna
 from app.services.scholarship_finder import find_scholarships
 from app.services.program_finder import find_tech_prep_programs, find_residency_programs
 from app.services.nyc_opportunity_finder import find_nyc_opportunities
-from app.services.opportunity_expiry import expire_old_opportunities
+from app.services.opportunity_expiry import expire_old_opportunities, expire_stale_seasonal_opportunities
 from app.services.link_cleanup import check_and_deactivate_dead_links
 
 logger = logging.getLogger("cyai_scheduler")
@@ -43,7 +43,7 @@ def _save_items(items: list, db):
 
 
 def scheduled_daily_sync():
-    logger.info("Running scheduled daily sync (CTFtime + Adzuna + expiry + link cleanup)")
+    logger.info("Running scheduled daily sync (CTFtime + Adzuna + expiry + link cleanup + seasonal check)")
     db = SessionLocal()
     try:
         ctf_items = fetch_upcoming_ctf_events(limit=20)
@@ -56,11 +56,13 @@ def scheduled_daily_sync():
         added_interns = _save_items(intern_items, db)
 
         expired_count = expire_old_opportunities(db)
+        seasonal_expired_count = expire_stale_seasonal_opportunities(db)
         link_cleanup_result = check_and_deactivate_dead_links(db)
 
         logger.info(
             f"Daily sync complete: {added_ctf} CTFs, {added_jobs} jobs, {added_interns} internships added, "
-            f"{expired_count} expired, {link_cleanup_result['deactivated']} dead links deactivated"
+            f"{expired_count} expired by deadline, {seasonal_expired_count} expired by stale season, "
+            f"{link_cleanup_result['deactivated']} dead links deactivated"
         )
     except Exception as e:
         logger.error(f"Daily sync failed: {e}")
@@ -111,4 +113,4 @@ def start_scheduler():
     scheduler.add_job(scheduled_daily_sync, "interval", hours=24, id="daily_sync", replace_existing=True)
     scheduler.add_job(scheduled_weekly_search, "interval", days=7, id="weekly_search", replace_existing=True)
     scheduler.start()
-    logger.info("Scheduler started: daily sync (24h, includes expiry + link cleanup), weekly AI search (7d)")
+    logger.info("Scheduler started: daily sync (24h, includes expiry + seasonal check + link cleanup), weekly AI search (7d)")
