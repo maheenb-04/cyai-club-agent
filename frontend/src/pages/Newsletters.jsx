@@ -10,6 +10,8 @@ function Newsletters() {
   const [editHtml, setEditHtml] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
   const [viewMode, setViewMode] = useState('preview')
+  const [testEmail, setTestEmail] = useState('')
+  const [sendingTest, setSendingTest] = useState(false)
 
   function loadNewsletters() {
     apiClient.get('/newsletters/').then((res) => setNewsletters(res.data))
@@ -37,6 +39,7 @@ function Newsletters() {
     setEditHtml(n.html_content || '')
     setConfirmSend(false)
     setViewMode('preview')
+    setTestEmail('')
   }
 
   function saveChanges() {
@@ -46,6 +49,17 @@ function Newsletters() {
         setSelected(res.data)
         loadNewsletters()
       })
+  }
+
+  function sendTestEmail() {
+    if (!testEmail.trim()) return
+    setSendingTest(true)
+    apiClient
+      .post('/newsletters/' + selected.id + '/send-test', { test_email: testEmail })
+      .then((res) => {
+        alert('Test email sent to ' + res.data.test_email + ' - check your inbox!')
+      })
+      .finally(() => setSendingTest(false))
   }
 
   function sendNewsletter() {
@@ -171,6 +185,26 @@ function Newsletters() {
               />
             </div>
           )}
+
+          <div className="bg-cream rounded-2xl p-4 mb-4">
+            <p className="font-display font-semibold text-sm mb-2">Send a test email first</p>
+            <div className="flex flex-col md:flex-row gap-3">
+              <input
+                type="email"
+                placeholder="your.email@example.com"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                className="border border-periwinkle rounded-full px-4 py-2 font-body text-sm flex-1"
+              />
+              <button
+                onClick={sendTestEmail}
+                disabled={sendingTest || !testEmail.trim()}
+                className="bg-periwinkle text-ink font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform disabled:opacity-50"
+              >
+                {sendingTest ? 'Sending...' : 'Send Test Email'}
+              </button>
+            </div>
+          </div>
 
           {selected.status !== 'sent' && (
             <div className="flex flex-wrap gap-3">
