@@ -4,6 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +16,10 @@ from app.services.newsletter_renderer import render_newsletter_pdf
 from app.core.limiter import limiter
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
+
+
+class TestSendRequest(BaseModel):
+    test_email: str
 
 
 def _extract_intro_html(html_content: str) -> str:
@@ -159,6 +164,27 @@ def render_newsletter_as_pdf(request: Request, newsletter_id: int, db: Session =
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=cyai_newsletter_{newsletter_id}.pdf"},
     )
+
+
+@router.post("/{newsletter_id}/send-test")
+@limiter.limit("10/hour")
+def send_test_newsletter(request: Request, newsletter_id: int, body: TestSendRequest, db: Session = Depends(get_db)):
+    newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+    if not newsletter:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+
+    result = send_newsletter_to_members(
+        [body.test_email],
+        f"[TEST] {newsletter.subject}",
+        newsletter.html_content,
+    )
+
+    return {
+        "newsletter_id": newsletter_id,
+        "test_email": body.test_email,
+        "sent": result["sent"],
+        "failed": result["failed"],
+    }
 
 
 @router.post("/{newsletter_id}/send")
