@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
-from sqlalchemy import text
 
 from app.database import engine, Base, SessionLocal
 from app import models
@@ -63,17 +62,6 @@ def on_startup():
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "cyai-club-agent"}
-
-
-@app.post("/system/migrate-add-attachment-column", dependencies=[Depends(verify_api_key)])
-def migrate_add_attachment_column():
-    db = SessionLocal()
-    try:
-        db.execute(text("ALTER TABLE newsletters ADD COLUMN IF NOT EXISTS attachment_filenames TEXT"))
-        db.commit()
-        return {"detail": "Migration complete: attachment_filenames column added"}
-    finally:
-        db.close()
 
 
 @app.post("/system/trigger-daily-sync", dependencies=[Depends(verify_api_key)])
