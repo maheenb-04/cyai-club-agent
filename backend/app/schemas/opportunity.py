@@ -20,6 +20,17 @@ class OpportunityCreate(OpportunityBase):
     pass
 
 
+class OpportunityUpdate(BaseModel):
+    category: Optional[str] = None
+    title: Optional[str] = None
+    organization: Optional[str] = None
+    description: Optional[str] = None
+    url: Optional[str] = None
+    deadline: Optional[str] = None
+    eligibility: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 class OpportunityResponse(OpportunityBase):
     id: int
     date_added: datetime

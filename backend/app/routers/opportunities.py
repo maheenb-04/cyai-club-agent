@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
-from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
+from app.schemas.opportunity import OpportunityCreate, OpportunityUpdate, OpportunityResponse
 from app.services.sourcing.ctftime import fetch_upcoming_ctf_events
 from app.services.sourcing.job_aggregator import fetch_adzuna_jobs, fetch_adzuna_internships
 from app.services.scholarship_finder import find_scholarships
@@ -81,6 +81,23 @@ def create_opportunity(opportunity: OpportunityCreate, db: Session = Depends(get
     db.commit()
     db.refresh(db_opportunity)
     return db_opportunity
+
+
+@router.patch("/{opportunity_id}", response_model=OpportunityResponse)
+def update_opportunity(opportunity_id: int, update: OpportunityUpdate, db: Session = Depends(get_db)):
+    opportunity = db.query(models.Opportunity).filter(
+        models.Opportunity.id == opportunity_id
+    ).first()
+    if not opportunity:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+
+    update_data = update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(opportunity, key, value)
+
+    db.commit()
+    db.refresh(opportunity)
+    return opportunity
 
 
 @router.delete("/{opportunity_id}")
