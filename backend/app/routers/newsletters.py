@@ -195,16 +195,22 @@ def upload_attachment(newsletter_id: int, file: UploadFile = File(...), db: Sess
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")
 
-    ext = os.path.splitext(file.filename)[1].lower()
+    safe_original_name = os.path.basename(file.filename or "")
+    ext = os.path.splitext(safe_original_name)[1].lower()
     if ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Only PDF, PNG, and JPG files are allowed")
 
+    file_bytes = file.file.read()
+    max_size = 25 * 1024 * 1024
+    if len(file_bytes) > max_size:
+        raise HTTPException(status_code=400, detail="File too large - maximum size is 25MB")
+
     os.makedirs(ATTACHMENT_DIR, exist_ok=True)
-    stored_filename = f"{newsletter_id}_{uuid.uuid4().hex[:8]}_{file.filename}"
+    stored_filename = f"{newsletter_id}_{uuid.uuid4().hex[:8]}_{safe_original_name}"
     filepath = os.path.join(ATTACHMENT_DIR, stored_filename)
 
     with open(filepath, "wb") as f:
-        f.write(file.file.read())
+        f.write(file_bytes)
 
     existing = _get_attachment_filenames(newsletter)
     existing.append(stored_filename)
