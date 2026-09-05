@@ -12,6 +12,8 @@ function Newsletters() {
   const [viewMode, setViewMode] = useState('preview')
   const [testEmail, setTestEmail] = useState('')
   const [sendingTest, setSendingTest] = useState(false)
+  const [attachments, setAttachments] = useState([])
+  const [uploadingFile, setUploadingFile] = useState(false)
 
   function loadNewsletters() {
     apiClient.get('/newsletters/').then((res) => setNewsletters(res.data))
@@ -33,6 +35,12 @@ function Newsletters() {
       .finally(() => setGenerating(false))
   }
 
+  function loadAttachments(newsletterId) {
+    apiClient.get('/newsletters/' + newsletterId + '/attachments').then((res) => {
+      setAttachments(res.data.filenames || [])
+    })
+  }
+
   function openNewsletter(n) {
     setSelected(n)
     setEditSubject(n.subject || '')
@@ -40,6 +48,7 @@ function Newsletters() {
     setConfirmSend(false)
     setViewMode('preview')
     setTestEmail('')
+    loadAttachments(n.id)
   }
 
   function saveChanges() {
@@ -49,6 +58,31 @@ function Newsletters() {
         setSelected(res.data)
         loadNewsletters()
       })
+  }
+
+  function handleFileUpload(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingFile(true)
+    const formData = new FormData()
+    formData.append('file', file)
+    apiClient
+      .post('/newsletters/' + selected.id + '/attachments', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((res) => {
+        setAttachments(res.data.filenames || [])
+      })
+      .finally(() => {
+        setUploadingFile(false)
+        e.target.value = ''
+      })
+  }
+
+  function removeAttachment(filename) {
+    apiClient.delete('/newsletters/' + selected.id + '/attachments/' + filename).then((res) => {
+      setAttachments(res.data.filenames || [])
+    })
   }
 
   function sendTestEmail() {
@@ -185,6 +219,36 @@ function Newsletters() {
               />
             </div>
           )}
+
+          <div className="bg-cream rounded-2xl p-4 mb-4">
+            <p className="font-display font-semibold text-sm mb-2">Attachments (flyers, PDF newsletter, images)</p>
+            <div className="space-y-2 mb-3">
+              {attachments.map((filename) => (
+                <div key={filename} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                  <span className="font-body text-xs truncate flex-1">{filename.split('_').slice(2).join('_')}</span>
+                  <button
+                    onClick={() => removeAttachment(filename)}
+                    className="font-display font-semibold text-xs text-cardinal ml-3 flex-shrink-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {attachments.length === 0 && (
+                <p className="font-body text-xs text-ink-soft">No attachments yet</p>
+              )}
+            </div>
+            <label className="inline-block bg-periwinkle text-ink font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform cursor-pointer">
+              {uploadingFile ? 'Uploading...' : '+ Attach File'}
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={handleFileUpload}
+                disabled={uploadingFile}
+                className="hidden"
+              />
+            </label>
+          </div>
 
           <div className="bg-cream rounded-2xl p-4 mb-4">
             <p className="font-display font-semibold text-sm mb-2">Send a test email first</p>

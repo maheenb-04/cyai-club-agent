@@ -59,6 +59,7 @@ class Newsletter(Base):
     subject = Column(String, nullable=True)
     html_content = Column(Text, nullable=True)
     sent_at = Column(DateTime, nullable=True)
+    attachment_filenames = Column(Text, nullable=True)
 
     opportunities = relationship(
         "NewsletterOpportunity", back_populates="newsletter"

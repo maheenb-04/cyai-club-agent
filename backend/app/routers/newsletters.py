@@ -1,8 +1,10 @@
 import re
+import os
+import uuid
 from typing import List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -17,6 +19,9 @@ from app.core.limiter import limiter
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
 
+ATTACHMENT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "newsletter_attachments")
+ALLOWED_ATTACHMENT_EXTENSIONS = (".pdf", ".png", ".jpg", ".jpeg")
+
 
 class TestSendRequest(BaseModel):
     test_email: str
@@ -27,6 +32,16 @@ def _extract_intro_html(html_content: str) -> str:
     if match:
         return match.group(1).strip()
     return html_content[:500]
+
+
+def _get_attachment_filenames(newsletter) -> list:
+    if not newsletter.attachment_filenames:
+        return []
+    return [f for f in newsletter.attachment_filenames.split(",") if f]
+
+
+def _get_attachment_paths(newsletter) -> list:
+    return [os.path.join(ATTACHMENT_DIR, f) for f in _get_attachment_filenames(newsletter)]
 
 
 @router.get("/", response_model=List[NewsletterResponse])
@@ -166,6 +181,58 @@ def render_newsletter_as_pdf(request: Request, newsletter_id: int, db: Session =
     )
 
 
+@router.get("/{newsletter_id}/attachments")
+def list_attachments(newsletter_id: int, db: Session = Depends(get_db)):
+    newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+    if not newsletter:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+    return {"filenames": _get_attachment_filenames(newsletter)}
+
+
+@router.post("/{newsletter_id}/attachments")
+def upload_attachment(newsletter_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+    if not newsletter:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only PDF, PNG, and JPG files are allowed")
+
+    os.makedirs(ATTACHMENT_DIR, exist_ok=True)
+    stored_filename = f"{newsletter_id}_{uuid.uuid4().hex[:8]}_{file.filename}"
+    filepath = os.path.join(ATTACHMENT_DIR, stored_filename)
+
+    with open(filepath, "wb") as f:
+        f.write(file.file.read())
+
+    existing = _get_attachment_filenames(newsletter)
+    existing.append(stored_filename)
+    newsletter.attachment_filenames = ",".join(existing)
+    db.commit()
+
+    return {"filenames": existing}
+
+
+@router.delete("/{newsletter_id}/attachments/{stored_filename}")
+def delete_attachment(newsletter_id: int, stored_filename: str, db: Session = Depends(get_db)):
+    newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+    if not newsletter:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+
+    existing = _get_attachment_filenames(newsletter)
+    if stored_filename in existing:
+        existing.remove(stored_filename)
+        newsletter.attachment_filenames = ",".join(existing)
+        db.commit()
+
+        filepath = os.path.join(ATTACHMENT_DIR, stored_filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+    return {"filenames": existing}
+
+
 @router.post("/{newsletter_id}/send-test")
 @limiter.limit("10/hour")
 def send_test_newsletter(request: Request, newsletter_id: int, body: TestSendRequest, db: Session = Depends(get_db)):
@@ -173,10 +240,13 @@ def send_test_newsletter(request: Request, newsletter_id: int, body: TestSendReq
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")
 
+    attachment_paths = _get_attachment_paths(newsletter)
+
     result = send_newsletter_to_members(
         [body.test_email],
         f"[TEST] {newsletter.subject}",
         newsletter.html_content,
+        attachment_paths,
     )
 
     return {
@@ -202,11 +272,13 @@ def send_newsletter(request: Request, newsletter_id: int, db: Session = Depends(
         raise HTTPException(status_code=400, detail="No active members to send to")
 
     member_emails = [m.email for m in active_members]
+    attachment_paths = _get_attachment_paths(newsletter)
 
     result = send_newsletter_to_members(
         member_emails,
         newsletter.subject,
         newsletter.html_content,
+        attachment_paths,
     )
 
     newsletter.status = "sent"
