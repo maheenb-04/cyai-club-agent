@@ -63,6 +63,101 @@ def health_check():
     return {"status": "ok", "service": "cyai-club-agent"}
 
 
+@app.post("/system/seed-nypd-items", dependencies=[Depends(verify_api_key)])
+def seed_nypd_items():
+    db = SessionLocal()
+    try:
+        items = [
+            {
+                "title": "ITB Customer Service Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Provide citywide technical diagnostics, active-directory administration, queue management, and hardware provisioning. Manage ServiceNow incidents, support citywide endpoint systems, and coordinate Dell warranty repairs.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11383742",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027. Knowledge of Active Directory, DNS, DHCP, TCP/IP preferred.",
+            },
+            {
+                "title": "Information Security Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Support Vulnerability Management & Remediation (VMR) projects - document requirements, track tactical plans, build workflow diagrams, and research VMR capabilities in existing security solutions.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11384293",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027.",
+            },
+            {
+                "title": "Active Directory / Cloud Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Design and support enterprise identity, directory, and Microsoft cloud-platform services - Active Directory, Microsoft Entra ID, hybrid identity, Microsoft 365, Power Platform, and Azure DevOps.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11383988",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027. AD, Entra ID, PowerShell knowledge preferred.",
+            },
+            {
+                "title": "Data Center Operations Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Coordinate operations, infrastructure projects, and lifecycle activities across multiple large-scale NYPD data centers, including hardware installs, cabling, power distribution, and vendor management.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11385442",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027.",
+            },
+            {
+                "title": "Application Division Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Build wireframes and prototypes in Figma, map operational workflows, support backlog prioritization, and run usability testing for department tools.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11385516",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027. UX/UI, HCI, or related field.",
+            },
+            {
+                "title": "IT Fiscal Affairs Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Support IT fiscal operations - procurement and contract tracking, invoice intake, and financial data compilation across the full IT budget workflow.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11385485",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027. Business, Finance, Accounting, Data Analytics, or related field.",
+            },
+            {
+                "title": "Unified Communication Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Support enterprise unified communications, VoIP, and audiovisual/conference-room technologies, including Cisco Unified Communications Manager and conference-room AV systems.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11385411",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027.",
+            },
+            {
+                "title": "Data Transmission Intern",
+                "organization": "NYPD Information Technology Bureau",
+                "description": "Support secure data transmission infrastructure - network and application delivery security, digital certificate administration, TLS configuration, and secure file-transfer platforms.",
+                "url": "https://york-cuny.joinhandshake.com/jobs/11385239",
+                "deadline": "2026-10-03",
+                "eligibility": "Part-time, 20 hrs/week, onsite NYC, October 1 2026-May 31 2027.",
+            },
+        ]
+
+        added = 0
+        for item in items:
+            exists = db.query(models.Opportunity).filter(models.Opportunity.url == item["url"]).first()
+            if exists:
+                continue
+            db.add(models.Opportunity(
+                category="internship",
+                title=item["title"],
+                organization=item["organization"],
+                description=item["description"],
+                url=item["url"],
+                deadline=item["deadline"],
+                eligibility=item["eligibility"],
+                source=f"manual_add:{item['url']}",
+                source_type="manual",
+            ))
+            added += 1
+
+        db.commit()
+        return {"added_opportunities": added}
+    finally:
+        db.close()
+
+
 @app.post("/system/trigger-daily-sync", dependencies=[Depends(verify_api_key)])
 def trigger_daily_sync():
     scheduled_daily_sync()
