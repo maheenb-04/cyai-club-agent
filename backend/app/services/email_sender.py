@@ -1,12 +1,29 @@
-import smtplib
+import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+import httpx
 
 from app.config import settings
 from app.services.tokens import generate_unsubscribe_token
 
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+
+
+def _get_access_token() -> str:
+    response = httpx.post(
+        GOOGLE_TOKEN_URL,
+        data={
+            "client_id": settings.gmail_client_id,
+            "client_secret": settings.gmail_client_secret,
+            "refresh_token": settings.gmail_refresh_token,
+            "grant_type": "refresh_token",
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
 
 
 def send_newsletter_email(to_email: str, subject: str, html_content: str) -> bool:
@@ -27,11 +44,17 @@ def send_newsletter_email(to_email: str, subject: str, html_content: str) -> boo
     message["To"] = to_email
     message.attach(MIMEText(full_html, "html"))
 
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(settings.gmail_address, settings.gmail_app_password)
-            server.sendmail(settings.gmail_address, to_email, message.as_string())
+        access_token = _get_access_token()
+        response = httpx.post(
+            GMAIL_SEND_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": raw_message},
+            timeout=15,
+        )
+        response.raise_for_status()
         return True
     except Exception as e:
         print(f"Failed to send to {to_email}: {e}")
