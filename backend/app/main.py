@@ -64,6 +64,55 @@ def health_check():
     return {"status": "ok", "service": "cyai-club-agent"}
 
 
+@app.post("/system/seed-additional-items", dependencies=[Depends(verify_api_key)])
+def seed_additional_items():
+    db = SessionLocal()
+    try:
+        items = [
+            {
+                "category": "job",
+                "title": "Data for Good Hackathon - Data & AI Program - 2027 Summer Internship",
+                "organization": "JPMorgan Chase",
+                "description": "A two-day hackathon solving real nonprofit data problems alongside JPMorganChase's Tech for Social Good team, held in Brooklyn, NY. Participation may lead to consideration for the 2027 Data & AI Program summer internship, building end-to-end data, analytics, and ML solutions.",
+                "url": "https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210775223",
+                "deadline": None,
+                "eligibility": "Pursuing a Bachelor's or Master's degree in a quantitative or technical discipline (Data Science, ML, CS, or Math), graduating December 2027-August 2028. Must be authorized to work in the U.S. No prior experience required.",
+            },
+            {
+                "category": "job",
+                "title": "NY Chamber of Commerce Business Expo",
+                "organization": "CUNY Borough of Manhattan Community College",
+                "description": "The 25th Annual Chamber Business Expo, Metropolitan NY's longest-running regional business fair, held in-person at BMCC. Companies attending include AWS, IBM, Google, LinkedIn, and Microsoft, with hands-on workshops (Google's Grow with Google, AWS no-code/low-code workshop, IBM career panel) and a main-stage AI panel on business, education, and technology.",
+                "url": "https://york-cuny.joinhandshake.com/stu/career_fairs/68952",
+                "deadline": "2026-09-17",
+                "eligibility": "Free attendance. Business casual attire recommended; bring resume copies.",
+            },
+        ]
+
+        added = 0
+        for item in items:
+            exists = db.query(models.Opportunity).filter(models.Opportunity.url == item["url"]).first()
+            if exists:
+                continue
+            db.add(models.Opportunity(
+                category=item["category"],
+                title=item["title"],
+                organization=item["organization"],
+                description=item["description"],
+                url=item["url"],
+                deadline=item["deadline"],
+                eligibility=item["eligibility"],
+                source=f"manual_add:{item['url']}",
+                source_type="manual",
+            ))
+            added += 1
+
+        db.commit()
+        return {"added_opportunities": added}
+    finally:
+        db.close()
+
+
 @app.post("/system/trigger-daily-sync", dependencies=[Depends(verify_api_key)])
 def trigger_daily_sync():
     scheduled_daily_sync()
