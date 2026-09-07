@@ -64,6 +64,22 @@ class Newsletter(Base):
     opportunities = relationship(
         "NewsletterOpportunity", back_populates="newsletter"
     )
+    attachments = relationship(
+        "NewsletterAttachment", back_populates="newsletter", cascade="all, delete-orphan"
+    )
+
+
+class NewsletterAttachment(Base):
+    __tablename__ = "newsletter_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    newsletter_id = Column(Integer, ForeignKey("newsletters.id"))
+    filename = Column(String, nullable=False)
+    content_type = Column(String, nullable=False)
+    data_base64 = Column(Text, nullable=False)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    newsletter = relationship("Newsletter", back_populates="attachments")
 
 
 class NewsletterOpportunity(Base):

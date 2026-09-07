@@ -1,6 +1,4 @@
 import re
-import os
-import uuid
 from typing import List
 from datetime import datetime
 
@@ -8,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+import base64 as b64lib
 
 from app.database import get_db
 from app import models
@@ -19,8 +18,8 @@ from app.core.limiter import limiter
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
 
-ATTACHMENT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "newsletter_attachments")
 ALLOWED_ATTACHMENT_EXTENSIONS = (".pdf", ".png", ".jpg", ".jpeg")
+MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024
 
 
 class TestSendRequest(BaseModel):
@@ -34,14 +33,23 @@ def _extract_intro_html(html_content: str) -> str:
     return html_content[:500]
 
 
-def _get_attachment_filenames(newsletter) -> list:
-    if not newsletter.attachment_filenames:
-        return []
-    return [f for f in newsletter.attachment_filenames.split(",") if f]
+def _content_type_for_ext(ext: str) -> str:
+    return {
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+    }.get(ext, "application/octet-stream")
 
 
-def _get_attachment_paths(newsletter) -> list:
-    return [os.path.join(ATTACHMENT_DIR, f) for f in _get_attachment_filenames(newsletter)]
+def _get_attachments_for_send(newsletter_id: int, db: Session) -> list:
+    rows = db.query(models.NewsletterAttachment).filter(
+        models.NewsletterAttachment.newsletter_id == newsletter_id
+    ).all()
+    return [
+        {"filename": r.filename, "content_type": r.content_type, "data_base64": r.data_base64}
+        for r in rows
+    ]
 
 
 @router.get("/", response_model=List[NewsletterResponse])
@@ -186,11 +194,17 @@ def list_attachments(newsletter_id: int, db: Session = Depends(get_db)):
     newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")
-    return {"filenames": _get_attachment_filenames(newsletter)}
+
+    rows = db.query(models.NewsletterAttachment).filter(
+        models.NewsletterAttachment.newsletter_id == newsletter_id
+    ).all()
+    return {"attachments": [{"id": r.id, "filename": r.filename} for r in rows]}
 
 
 @router.post("/{newsletter_id}/attachments")
 def upload_attachment(newsletter_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    import os
+
     newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")
@@ -201,42 +215,45 @@ def upload_attachment(newsletter_id: int, file: UploadFile = File(...), db: Sess
         raise HTTPException(status_code=400, detail="Only PDF, PNG, and JPG files are allowed")
 
     file_bytes = file.file.read()
-    max_size = 25 * 1024 * 1024
-    if len(file_bytes) > max_size:
+    if len(file_bytes) > MAX_ATTACHMENT_SIZE:
         raise HTTPException(status_code=400, detail="File too large - maximum size is 25MB")
 
-    os.makedirs(ATTACHMENT_DIR, exist_ok=True)
-    stored_filename = f"{newsletter_id}_{uuid.uuid4().hex[:8]}_{safe_original_name}"
-    filepath = os.path.join(ATTACHMENT_DIR, stored_filename)
+    data_base64 = b64lib.b64encode(file_bytes).decode("utf-8")
+    content_type = _content_type_for_ext(ext)
 
-    with open(filepath, "wb") as f:
-        f.write(file_bytes)
-
-    existing = _get_attachment_filenames(newsletter)
-    existing.append(stored_filename)
-    newsletter.attachment_filenames = ",".join(existing)
+    attachment = models.NewsletterAttachment(
+        newsletter_id=newsletter_id,
+        filename=safe_original_name,
+        content_type=content_type,
+        data_base64=data_base64,
+    )
+    db.add(attachment)
     db.commit()
 
-    return {"filenames": existing}
+    rows = db.query(models.NewsletterAttachment).filter(
+        models.NewsletterAttachment.newsletter_id == newsletter_id
+    ).all()
+    return {"attachments": [{"id": r.id, "filename": r.filename} for r in rows]}
 
 
-@router.delete("/{newsletter_id}/attachments/{stored_filename}")
-def delete_attachment(newsletter_id: int, stored_filename: str, db: Session = Depends(get_db)):
+@router.delete("/{newsletter_id}/attachments/{attachment_id}")
+def delete_attachment(newsletter_id: int, attachment_id: int, db: Session = Depends(get_db)):
     newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")
 
-    existing = _get_attachment_filenames(newsletter)
-    if stored_filename in existing:
-        existing.remove(stored_filename)
-        newsletter.attachment_filenames = ",".join(existing)
+    attachment = db.query(models.NewsletterAttachment).filter(
+        models.NewsletterAttachment.id == attachment_id,
+        models.NewsletterAttachment.newsletter_id == newsletter_id,
+    ).first()
+    if attachment:
+        db.delete(attachment)
         db.commit()
 
-        filepath = os.path.join(ATTACHMENT_DIR, stored_filename)
-        if os.path.exists(filepath):
-            os.remove(filepath)
-
-    return {"filenames": existing}
+    rows = db.query(models.NewsletterAttachment).filter(
+        models.NewsletterAttachment.newsletter_id == newsletter_id
+    ).all()
+    return {"attachments": [{"id": r.id, "filename": r.filename} for r in rows]}
 
 
 @router.post("/{newsletter_id}/send-test")
@@ -246,13 +263,13 @@ def send_test_newsletter(request: Request, newsletter_id: int, body: TestSendReq
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")
 
-    attachment_paths = _get_attachment_paths(newsletter)
+    attachments = _get_attachments_for_send(newsletter_id, db)
 
     result = send_newsletter_to_members(
         [body.test_email],
         f"[TEST] {newsletter.subject}",
         newsletter.html_content,
-        attachment_paths,
+        attachments,
     )
 
     return {
@@ -278,13 +295,13 @@ def send_newsletter(request: Request, newsletter_id: int, db: Session = Depends(
         raise HTTPException(status_code=400, detail="No active members to send to")
 
     member_emails = [m.email for m in active_members]
-    attachment_paths = _get_attachment_paths(newsletter)
+    attachments = _get_attachments_for_send(newsletter_id, db)
 
     result = send_newsletter_to_members(
         member_emails,
         newsletter.subject,
         newsletter.html_content,
-        attachment_paths,
+        attachments,
     )
 
     newsletter.status = "sent"

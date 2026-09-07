@@ -1,6 +1,4 @@
 import base64
-import os
-import mimetypes
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -30,27 +28,19 @@ def _get_access_token() -> str:
     return response.json()["access_token"]
 
 
-def _attach_file(message: MIMEMultipart, filepath: str):
-    if not os.path.exists(filepath):
-        return
+def _attach_from_base64(message: MIMEMultipart, filename: str, content_type: str, data_base64: str):
+    main_type, sub_type = content_type.split("/", 1) if "/" in content_type else ("application", "octet-stream")
 
-    filename = os.path.basename(filepath)
-    content_type, encoding = mimetypes.guess_type(filepath)
-    if content_type is None:
-        content_type = "application/octet-stream"
+    file_bytes = base64.b64decode(data_base64)
 
-    main_type, sub_type = content_type.split("/", 1)
-
-    with open(filepath, "rb") as f:
-        part = MIMEBase(main_type, sub_type)
-        part.set_payload(f.read())
-
+    part = MIMEBase(main_type, sub_type)
+    part.set_payload(file_bytes)
     encoders.encode_base64(part)
     part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
     message.attach(part)
 
 
-def send_newsletter_email(to_email: str, subject: str, html_content: str, attachment_paths: list = None) -> bool:
+def send_newsletter_email(to_email: str, subject: str, html_content: str, attachments: list = None) -> bool:
     unsubscribe_token = generate_unsubscribe_token(to_email)
     unsubscribe_link = f"http://localhost:8000/members/unsubscribe?token={unsubscribe_token}"
 
@@ -71,8 +61,8 @@ def send_newsletter_email(to_email: str, subject: str, html_content: str, attach
     body.attach(MIMEText(full_html, "html"))
     message.attach(body)
 
-    for path in (attachment_paths or []):
-        _attach_file(message, path)
+    for att in (attachments or []):
+        _attach_from_base64(message, att["filename"], att["content_type"], att["data_base64"])
 
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
 
@@ -91,12 +81,12 @@ def send_newsletter_email(to_email: str, subject: str, html_content: str, attach
         return False
 
 
-def send_newsletter_to_members(member_emails: list, subject: str, html_content: str, attachment_paths: list = None) -> dict:
+def send_newsletter_to_members(member_emails: list, subject: str, html_content: str, attachments: list = None) -> dict:
     sent = 0
     failed = 0
 
     for email in member_emails:
-        success = send_newsletter_email(email, subject, html_content, attachment_paths)
+        success = send_newsletter_email(email, subject, html_content, attachments)
         if success:
             sent += 1
         else:

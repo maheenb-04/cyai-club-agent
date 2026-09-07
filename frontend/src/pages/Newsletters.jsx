@@ -37,7 +37,7 @@ function Newsletters() {
 
   function loadAttachments(newsletterId) {
     apiClient.get('/newsletters/' + newsletterId + '/attachments').then((res) => {
-      setAttachments(res.data.filenames || [])
+      setAttachments(res.data.attachments || [])
     })
   }
 
@@ -71,7 +71,7 @@ function Newsletters() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then((res) => {
-        setAttachments(res.data.filenames || [])
+        setAttachments(res.data.attachments || [])
       })
       .finally(() => {
         setUploadingFile(false)
@@ -79,9 +79,9 @@ function Newsletters() {
       })
   }
 
-  function removeAttachment(filename) {
-    apiClient.delete('/newsletters/' + selected.id + '/attachments/' + filename).then((res) => {
-      setAttachments(res.data.filenames || [])
+  function removeAttachment(attachmentId) {
+    apiClient.delete('/newsletters/' + selected.id + '/attachments/' + attachmentId).then((res) => {
+      setAttachments(res.data.attachments || [])
     })
   }
 
@@ -223,11 +223,11 @@ function Newsletters() {
           <div className="bg-cream rounded-2xl p-4 mb-4">
             <p className="font-display font-semibold text-sm mb-2">Attachments (flyers, PDF newsletter, images)</p>
             <div className="space-y-2 mb-3">
-              {attachments.map((filename) => (
-                <div key={filename} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
-                  <span className="font-body text-xs truncate flex-1">{filename.split('_').slice(2).join('_')}</span>
+              {attachments.map((att) => (
+                <div key={att.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                  <span className="font-body text-xs truncate flex-1">{att.filename}</span>
                   <button
-                    onClick={() => removeAttachment(filename)}
+                    onClick={() => removeAttachment(att.id)}
                     className="font-display font-semibold text-xs text-cardinal ml-3 flex-shrink-0"
                   >
                     Remove
