@@ -281,7 +281,7 @@ def send_test_newsletter(request: Request, newsletter_id: int, body: TestSendReq
 
 
 @router.post("/{newsletter_id}/send")
-@limiter.limit("3/hour")
+@limiter.limit("10/hour")
 def send_newsletter(request: Request, newsletter_id: int, db: Session = Depends(get_db)):
     newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
     if not newsletter:
