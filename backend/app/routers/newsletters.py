@@ -2,13 +2,13 @@ import re
 from typing import List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import base64 as b64lib
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app import models
 from app.schemas.newsletter import NewsletterResponse, NewsletterUpdate
 from app.services.newsletter_generator import generate_newsletter_html
@@ -280,15 +280,31 @@ def send_test_newsletter(request: Request, newsletter_id: int, body: TestSendReq
     }
 
 
+def _send_newsletter_background(newsletter_id: int, member_emails: list, subject: str, html_content: str, attachments: list):
+    db = SessionLocal()
+    try:
+        result = send_newsletter_to_members(member_emails, subject, html_content, attachments)
+        newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+        if newsletter:
+            newsletter.status = "sent"
+            newsletter.sent_at = datetime.utcnow()
+            newsletter.sent_count = result["sent"]
+            newsletter.failed_count = result["failed"]
+            newsletter.recipients_attempted = len(member_emails)
+            db.commit()
+    finally:
+        db.close()
+
+
 @router.post("/{newsletter_id}/send")
 @limiter.limit("10/hour")
-def send_newsletter(request: Request, newsletter_id: int, db: Session = Depends(get_db)):
+def send_newsletter(request: Request, newsletter_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
     if not newsletter:
         raise HTTPException(status_code=404, detail="Newsletter not found")
 
-    if newsletter.status == "sent":
-        raise HTTPException(status_code=400, detail="This newsletter has already been sent")
+    if newsletter.status in ("sent", "sending"):
+        raise HTTPException(status_code=400, detail="This newsletter has already been sent or is currently sending")
 
     active_members = db.query(models.Member).filter(models.Member.is_active == True).all()
     if not active_members:
@@ -297,22 +313,23 @@ def send_newsletter(request: Request, newsletter_id: int, db: Session = Depends(
     member_emails = [m.email for m in active_members]
     attachments = _get_attachments_for_send(newsletter_id, db)
 
-    result = send_newsletter_to_members(
+    newsletter.status = "sending"
+    db.commit()
+
+    background_tasks.add_task(
+        _send_newsletter_background,
+        newsletter_id,
         member_emails,
         newsletter.subject,
         newsletter.html_content,
         attachments,
     )
 
-    newsletter.status = "sent"
-    newsletter.sent_at = datetime.utcnow()
-    db.commit()
-
     return {
         "newsletter_id": newsletter_id,
+        "status": "sending",
         "recipients_attempted": len(member_emails),
-        "sent": result["sent"],
-        "failed": result["failed"],
+        "detail": "Sending started in the background - refresh in a minute to see final results",
     }
 
 

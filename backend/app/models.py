@@ -60,6 +60,9 @@ class Newsletter(Base):
     html_content = Column(Text, nullable=True)
     sent_at = Column(DateTime, nullable=True)
     attachment_filenames = Column(Text, nullable=True)
+    sent_count = Column(Integer, nullable=True)
+    failed_count = Column(Integer, nullable=True)
+    recipients_attempted = Column(Integer, nullable=True)
 
     opportunities = relationship(
         "NewsletterOpportunity", back_populates="newsletter"
