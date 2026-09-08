@@ -19,6 +19,7 @@ from app.core.limiter import limiter
 from app.core.scheduler import start_scheduler, scheduled_daily_sync, scheduled_weekly_search
 from app.services.opportunity_expiry import expire_old_opportunities
 from app.services.link_cleanup import check_and_deactivate_dead_links
+from sqlalchemy import text
 
 Base.metadata.create_all(bind=engine)
 
@@ -62,6 +63,19 @@ def on_startup():
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "cyai-club-agent"}
+
+
+@app.post("/system/migrate-send-tracking-columns", dependencies=[Depends(verify_api_key)])
+def migrate_send_tracking_columns():
+    db = SessionLocal()
+    try:
+        db.execute(text("ALTER TABLE newsletters ADD COLUMN IF NOT EXISTS sent_count INTEGER"))
+        db.execute(text("ALTER TABLE newsletters ADD COLUMN IF NOT EXISTS failed_count INTEGER"))
+        db.execute(text("ALTER TABLE newsletters ADD COLUMN IF NOT EXISTS recipients_attempted INTEGER"))
+        db.commit()
+        return {"detail": "Migration complete"}
+    finally:
+        db.close()
 
 
 @app.post("/system/trigger-daily-sync", dependencies=[Depends(verify_api_key)])
