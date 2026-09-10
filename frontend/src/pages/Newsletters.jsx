@@ -14,6 +14,8 @@ function Newsletters() {
   const [sendingTest, setSendingTest] = useState(false)
   const [attachments, setAttachments] = useState([])
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [sendingReal, setSendingReal] = useState(false)
+  const [sendResult, setSendResult] = useState(null)
 
   function loadNewsletters() {
     apiClient.get('/newsletters/').then((res) => setNewsletters(res.data))
@@ -96,11 +98,37 @@ function Newsletters() {
       .finally(() => setSendingTest(false))
   }
 
+  function pollNewsletterStatus(newsletterId, attemptsLeft) {
+    if (attemptsLeft <= 0) {
+      setSendingReal(false)
+      setSendResult({ error: true, message: 'Sending is taking longer than expected. Check back in a few minutes.' })
+      return
+    }
+    apiClient.get('/newsletters/' + newsletterId).then((res) => {
+      if (res.data.status === 'sent') {
+        setSendingReal(false)
+        setSendResult({
+          error: false,
+          sent: res.data.sent_count,
+          failed: res.data.failed_count,
+          attempted: res.data.recipients_attempted,
+        })
+        loadNewsletters()
+      } else {
+        setTimeout(() => pollNewsletterStatus(newsletterId, attemptsLeft - 1), 4000)
+      }
+    })
+  }
+
   function sendNewsletter() {
-    apiClient.post('/newsletters/' + selected.id + '/send').then((res) => {
-      alert('Sent to ' + res.data.sent + ' of ' + res.data.recipients_attempted + ' members')
-      setSelected(null)
-      loadNewsletters()
+    setSendingReal(true)
+    setSendResult(null)
+    setConfirmSend(false)
+    apiClient.post('/newsletters/' + selected.id + '/send').then(() => {
+      pollNewsletterStatus(selected.id, 45)
+    }).catch(() => {
+      setSendingReal(false)
+      setSendResult({ error: true, message: 'Failed to start sending. Please try again.' })
     })
   }
 
@@ -270,7 +298,31 @@ function Newsletters() {
             </div>
           </div>
 
-          {selected.status !== 'sent' && (
+          {sendResult && (
+            <div className={
+              sendResult.error
+                ? "bg-cardinal text-white rounded-2xl p-5 mb-4 font-display font-semibold"
+                : "bg-mustard text-ink rounded-2xl p-5 mb-4 font-display font-semibold"
+            }>
+              {sendResult.error ? (
+                <p>{sendResult.message}</p>
+              ) : (
+                <p>
+                  Newsletter sent successfully. {sendResult.sent} of {sendResult.attempted} emails delivered
+                  {sendResult.failed > 0 ? ', ' + sendResult.failed + ' failed' : ''}.
+                </p>
+              )}
+            </div>
+          )}
+
+          {sendingReal && (
+            <div className="bg-periwinkle text-ink rounded-2xl p-5 mb-4 font-display font-semibold flex items-center gap-3">
+              <span className="inline-block w-4 h-4 border-2 border-ink border-t-transparent rounded-full animate-spin"></span>
+              Sending to all active members, this may take a minute or two. Do not close this page or click send again.
+            </div>
+          )}
+
+          {selected.status !== 'sent' && !sendingReal && (
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={saveChanges}
