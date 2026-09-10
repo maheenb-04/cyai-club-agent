@@ -13,6 +13,12 @@ class MemberCreate(MemberBase):
     pass
 
 
+class MemberUpdate(BaseModel):
+    email: Optional[str] = None
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 class MemberResponse(MemberBase):
     id: int
     is_active: bool

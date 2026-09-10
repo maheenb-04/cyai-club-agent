@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app import models
-from app.schemas.member import MemberCreate, MemberResponse
+from app.schemas.member import MemberCreate, MemberUpdate, MemberResponse
 from app.services.tokens import verify_unsubscribe_token
 from app.core.security import verify_api_key
 from app.core.limiter import limiter
@@ -59,6 +59,21 @@ def add_member(member: MemberCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_member)
     return db_member
+
+
+@router.patch("/{member_id}", response_model=MemberResponse, dependencies=[Depends(verify_api_key)])
+def update_member(member_id: int, update: MemberUpdate, db: Session = Depends(get_db)):
+    member = db.query(models.Member).filter(models.Member.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    update_data = update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(member, key, value)
+
+    db.commit()
+    db.refresh(member)
+    return member
 
 
 @router.post("/bulk-import", dependencies=[Depends(verify_api_key)])
