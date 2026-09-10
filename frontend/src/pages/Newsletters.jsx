@@ -90,10 +90,18 @@ function Newsletters() {
   function sendTestEmail() {
     if (!testEmail.trim()) return
     setSendingTest(true)
+    setSendResult(null)
     apiClient
       .post('/newsletters/' + selected.id + '/send-test', { test_email: testEmail })
       .then((res) => {
-        alert('Test email sent to ' + res.data.test_email + ' - check your inbox!')
+        if (res.data.sent > 0) {
+          setSendResult({ error: false, sent: res.data.sent, attempted: 1, failed: res.data.failed, isTest: true, testEmail: res.data.test_email })
+        } else {
+          setSendResult({ error: true, message: 'Test email failed to send. Check the address and try again.' })
+        }
+      })
+      .catch(() => {
+        setSendResult({ error: true, message: 'Test email failed to send. Please try again.' })
       })
       .finally(() => setSendingTest(false))
   }
@@ -306,6 +314,8 @@ function Newsletters() {
             }>
               {sendResult.error ? (
                 <p>{sendResult.message}</p>
+              ) : sendResult.isTest ? (
+                <p>Test email sent successfully to {sendResult.testEmail}. Check your inbox.</p>
               ) : (
                 <p>
                   Newsletter sent successfully. {sendResult.sent} of {sendResult.attempted} emails delivered
