@@ -16,6 +16,12 @@ function Newsletters() {
   const [uploadingFile, setUploadingFile] = useState(false)
   const [sendingReal, setSendingReal] = useState(false)
   const [sendResult, setSendResult] = useState(null)
+  const [allMembers, setAllMembers] = useState([])
+  const [selectedMemberIds, setSelectedMemberIds] = useState([])
+  const [showMemberPicker, setShowMemberPicker] = useState(false)
+  const [allMembers, setAllMembers] = useState([])
+  const [selectedMemberIds, setSelectedMemberIds] = useState([])
+  const [showMemberPicker, setShowMemberPicker] = useState(false)
 
   function loadNewsletters() {
     apiClient.get('/newsletters/').then((res) => setNewsletters(res.data))
@@ -133,6 +139,41 @@ function Newsletters() {
     setSendResult(null)
     setConfirmSend(false)
     apiClient.post('/newsletters/' + selected.id + '/send').then(() => {
+      pollNewsletterStatus(selected.id, 45)
+    }).catch(() => {
+      setSendingReal(false)
+      setSendResult({ error: true, message: 'Failed to start sending. Please try again.' })
+    })
+  }
+
+  function loadMembersForPicker() {
+    apiClient.get('/members/').then((res) => {
+      setAllMembers(res.data.filter((m) => m.is_active))
+    })
+    setShowMemberPicker(true)
+    setSelectedMemberIds([])
+  }
+
+  function toggleMemberSelected(id) {
+    setSelectedMemberIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  function selectAllMembers() {
+    setSelectedMemberIds(allMembers.map((m) => m.id))
+  }
+
+  function deselectAllMembers() {
+    setSelectedMemberIds([])
+  }
+
+  function sendToSelectedMembers() {
+    if (selectedMemberIds.length === 0) return
+    setSendingReal(true)
+    setSendResult(null)
+    setShowMemberPicker(false)
+    apiClient.post('/newsletters/' + selected.id + '/send-to-selected', { member_ids: selectedMemberIds }).then(() => {
       pollNewsletterStatus(selected.id, 45)
     }).catch(() => {
       setSendingReal(false)
@@ -332,31 +373,80 @@ function Newsletters() {
             </div>
           )}
 
-          {selected.status !== 'sent' && !sendingReal && (
+          {showMemberPicker && !sendingReal && (
+            <div className="bg-cream rounded-2xl p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-display font-semibold text-sm">Select members to send to</p>
+                <div className="flex gap-2">
+                  <button onClick={selectAllMembers} className="font-display font-semibold text-xs text-cardinal">Select All</button>
+                  <button onClick={deselectAllMembers} className="font-display font-semibold text-xs text-ink-soft">Deselect All</button>
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-1 mb-3 bg-white rounded-lg p-2">
+                {allMembers.map((m) => (
+                  <label key={m.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-cream cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedMemberIds.includes(m.id)}
+                      onChange={() => toggleMemberSelected(m.id)}
+                    />
+                    <span className="font-body text-xs">{m.name || m.email} {m.name ? '(' + m.email + ')' : ''}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={sendToSelectedMembers}
+                  disabled={selectedMemberIds.length === 0}
+                  className="bg-cardinal text-white font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform disabled:opacity-50"
+                >
+                  Send to Selected ({selectedMemberIds.length})
+                </button>
+                <button
+                  onClick={() => setShowMemberPicker(false)}
+                  className="font-display font-semibold text-sm text-ink-soft"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!sendingReal && !showMemberPicker && (
             <div className="flex flex-wrap gap-3">
+              {selected.status !== 'sent' && (
+                <button
+                  onClick={saveChanges}
+                  className="bg-periwinkle text-ink font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
+                >
+                  Save Changes
+                </button>
+              )}
               <button
-                onClick={saveChanges}
+                onClick={loadMembersForPicker}
                 className="bg-periwinkle text-ink font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
               >
-                Save Changes
+                Send to Selected Members
               </button>
-              {!confirmSend ? (
-                <button
-                  onClick={() => setConfirmSend(true)}
-                  className="bg-cardinal text-white font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
-                >
-                  Send Newsletter
-                </button>
-              ) : (
-                <div className="flex items-center gap-3 bg-cream rounded-full px-4 py-2">
-                  <span className="font-body text-sm">Send to all active members?</span>
-                  <button onClick={sendNewsletter} className="font-display font-semibold text-sm text-cardinal">
-                    Yes, send
+              {selected.status !== 'sent' && (
+                !confirmSend ? (
+                  <button
+                    onClick={() => setConfirmSend(true)}
+                    className="bg-cardinal text-white font-display font-semibold text-sm px-5 py-2 rounded-full hover:-translate-y-0.5 transition-transform"
+                  >
+                    Send Newsletter
                   </button>
-                  <button onClick={() => setConfirmSend(false)} className="font-display font-semibold text-sm text-ink-soft">
-                    Cancel
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-3 bg-cream rounded-full px-4 py-2">
+                    <span className="font-body text-sm">Send to all active members?</span>
+                    <button onClick={sendNewsletter} className="font-display font-semibold text-sm text-cardinal">
+                      Yes, send
+                    </button>
+                    <button onClick={() => setConfirmSend(false)} className="font-display font-semibold text-sm text-ink-soft">
+                      Cancel
+                    </button>
+                  </div>
+                )
               )}
             </div>
           )}
