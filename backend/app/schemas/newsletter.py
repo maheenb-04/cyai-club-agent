@@ -11,6 +11,9 @@ class NewsletterResponse(BaseModel):
     subject: Optional[str] = None
     html_content: Optional[str] = None
     sent_at: Optional[datetime] = None
+    sent_count: Optional[int] = None
+    failed_count: Optional[int] = None
+    recipients_attempted: Optional[int] = None
 
     class Config:
         from_attributes = True

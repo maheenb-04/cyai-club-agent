@@ -290,8 +290,11 @@ def _send_newsletter_background(newsletter_id: int, member_emails: list, subject
         result = send_newsletter_to_members(member_emails, subject, html_content, attachments)
         newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
         if newsletter:
-            newsletter.status = "sent"
-            newsletter.sent_at = datetime.utcnow()
+            if result["sent"] > 0:
+                newsletter.status = "sent"
+                newsletter.sent_at = datetime.utcnow()
+            else:
+                newsletter.status = "send_failed"
             newsletter.sent_count = result["sent"]
             newsletter.failed_count = result["failed"]
             newsletter.recipients_attempted = len(member_emails)

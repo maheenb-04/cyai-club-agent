@@ -125,6 +125,13 @@ function Newsletters() {
           attempted: res.data.recipients_attempted,
         })
         loadNewsletters()
+      } else if (res.data.status === 'send_failed') {
+        setSendingReal(false)
+        setSendResult({
+          error: true,
+          message: 'Sending failed for all ' + (res.data.recipients_attempted || '') + ' recipients. This usually means the email connection needs to be reconnected. Nothing was delivered.',
+        })
+        loadNewsletters()
       } else {
         setTimeout(() => pollNewsletterStatus(newsletterId, attemptsLeft - 1), 4000)
       }
