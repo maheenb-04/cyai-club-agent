@@ -26,6 +26,10 @@ class TestSendRequest(BaseModel):
     test_email: str
 
 
+class SelectedSendRequest(BaseModel):
+    member_ids: list[int]
+
+
 def _extract_intro_html(html_content: str) -> str:
     match = re.search(r"^(.*?)(?=<h2)", html_content, re.DOTALL)
     if match:
@@ -294,6 +298,43 @@ def _send_newsletter_background(newsletter_id: int, member_emails: list, subject
             db.commit()
     finally:
         db.close()
+
+
+@router.post("/{newsletter_id}/send-to-selected")
+@limiter.limit("10/hour")
+def send_to_selected(request: Request, newsletter_id: int, body: SelectedSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    newsletter = db.query(models.Newsletter).filter(models.Newsletter.id == newsletter_id).first()
+    if not newsletter:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+
+    if not body.member_ids:
+        raise HTTPException(status_code=400, detail="No members selected")
+
+    selected_members = db.query(models.Member).filter(
+        models.Member.id.in_(body.member_ids),
+        models.Member.is_active == True,
+    ).all()
+    if not selected_members:
+        raise HTTPException(status_code=400, detail="No valid active members found for the given IDs")
+
+    member_emails = [m.email for m in selected_members]
+    attachments = _get_attachments_for_send(newsletter_id, db)
+
+    background_tasks.add_task(
+        _send_newsletter_background,
+        newsletter_id,
+        member_emails,
+        newsletter.subject,
+        newsletter.html_content,
+        attachments,
+    )
+
+    return {
+        "newsletter_id": newsletter_id,
+        "status": "sending",
+        "recipients_attempted": len(member_emails),
+        "detail": "Sending started in the background to selected members",
+    }
 
 
 @router.post("/{newsletter_id}/send")
