@@ -19,9 +19,6 @@ function Newsletters() {
   const [allMembers, setAllMembers] = useState([])
   const [selectedMemberIds, setSelectedMemberIds] = useState([])
   const [showMemberPicker, setShowMemberPicker] = useState(false)
-  const [allMembers, setAllMembers] = useState([])
-  const [selectedMemberIds, setSelectedMemberIds] = useState([])
-  const [showMemberPicker, setShowMemberPicker] = useState(false)
 
   function loadNewsletters() {
     apiClient.get('/newsletters/').then((res) => setNewsletters(res.data))
