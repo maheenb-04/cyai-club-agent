@@ -19,6 +19,12 @@ class NewsletterResponse(BaseModel):
         from_attributes = True
 
 
+class NewsletterCreate(BaseModel):
+    subject: Optional[str] = None
+    html_content: Optional[str] = None
+    status: Optional[str] = "draft"
+
+
 class NewsletterUpdate(BaseModel):
     subject: Optional[str] = None
     html_content: Optional[str] = None
