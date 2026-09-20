@@ -10,7 +10,7 @@ import base64 as b64lib
 
 from app.database import get_db, SessionLocal
 from app import models
-from app.schemas.newsletter import NewsletterResponse, NewsletterUpdate
+from app.schemas.newsletter import NewsletterResponse, NewsletterUpdate, NewsletterCreate
 from app.services.newsletter_generator import generate_newsletter_html
 from app.services.email_sender import send_newsletter_to_members
 from app.services.newsletter_renderer import render_newsletter_pdf
@@ -59,6 +59,15 @@ def _get_attachments_for_send(newsletter_id: int, db: Session) -> list:
 @router.get("/", response_model=List[NewsletterResponse])
 def list_newsletters(db: Session = Depends(get_db)):
     return db.query(models.Newsletter).order_by(models.Newsletter.created_at.desc()).all()
+
+
+@router.post("/", response_model=NewsletterResponse)
+def create_newsletter(newsletter: NewsletterCreate, db: Session = Depends(get_db)):
+    db_newsletter = models.Newsletter(**newsletter.model_dump())
+    db.add(db_newsletter)
+    db.commit()
+    db.refresh(db_newsletter)
+    return db_newsletter
 
 
 @router.get("/{newsletter_id}", response_model=NewsletterResponse)
