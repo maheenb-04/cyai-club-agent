@@ -7,6 +7,7 @@ from app.database import get_db
 from app import models
 from app.schemas.social_post import SocialPostResponse, SocialPostUpdate, SocialPostManualCreate
 from app.services.social_generator import generate_circlein_post, generate_instagram_post
+from app.services.mistral_client import MistralUnavailableError
 from app.core.limiter import limiter
 
 router = APIRouter(prefix="/social-posts", tags=["social-posts"])
@@ -69,8 +70,15 @@ def generate_social_post(
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
 
+    try:
+        if platform == "circlein":
+            result = generate_circlein_post(opportunity, event)
+        else:
+            result = generate_instagram_post(opportunity, event)
+    except MistralUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
     if platform == "circlein":
-        result = generate_circlein_post(opportunity, event)
         db_post = models.SocialPost(
             opportunity_id=opportunity_id,
             platform="circlein",
@@ -79,7 +87,6 @@ def generate_social_post(
             posting_mode="manual",
         )
     else:
-        result = generate_instagram_post(opportunity, event)
         db_post = models.SocialPost(
             opportunity_id=opportunity_id,
             platform="instagram",

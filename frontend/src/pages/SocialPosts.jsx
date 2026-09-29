@@ -33,6 +33,9 @@ function SocialPosts() {
     apiClient.post('/social-posts/generate', null, { params }).then(() => {
       setSourceId('')
       loadPosts()
+    }).catch((err) => {
+      const detail = err.response?.data?.detail || 'Something went wrong generating this post. Check the backend logs.'
+      alert(detail)
     }).finally(() => setGenerating(false))
   }
 
